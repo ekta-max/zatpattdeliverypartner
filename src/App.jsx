@@ -5,8 +5,9 @@ import { LanguageProvider } from "./context/LanguageContext";
 
 
 /* AUTH & INTRO */
-
+ 
 import PermissionsPage from "./pages/PermissionsPage";
+import LocationPicker from "./pages/LocationPicker";
 import LanguageSelectPage from "./pages/LanguageSelectPage";
 import InfoPage from "./pages/InfoPage";
 import LoginPage from "./pages/LoginPage";
@@ -50,6 +51,7 @@ export default function App() {
         {/* ================= INITIAL FLOW ================= */}
 
         <Route path="/" element={<PermissionsPage />} />
+        <Route path="/location-picker" element={<LocationPicker />} />
         <Route path="/language" element={<LanguageSelectPage />} />
         <Route path="/info" element={<InfoPage />} />
         <Route path="/login" element={< LoginPage />} />

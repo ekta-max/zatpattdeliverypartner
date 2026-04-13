@@ -1,3 +1,5 @@
+//src\pages\OnboardingStepsPage.jsx
+
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -8,6 +10,7 @@ import {
   Lock,
   CheckCircle,
 } from "lucide-react";
+import { DEV_MODE } from "../config/appConfig";
 
 export default function OnboardingStepsPage() {
   const navigate = useNavigate();
@@ -23,11 +26,16 @@ export default function OnboardingStepsPage() {
       };
 
     // 🚫 If kit already ordered → NEVER show onboarding again
-    if (stored.kit_ordered) {
-      navigate("/verification-pending", { replace: true });
-      return;
-    }
+    // if (stored.kit_ordered) {
+    //   navigate("/verification-pending", { replace: true });
+    //   return;
+    // }
 
+    
+
+if (!DEV_MODE && stored.kit_ordered) {
+  navigate("/verification-pending");
+}
     setProgress(stored);
   }, [navigate]);
 

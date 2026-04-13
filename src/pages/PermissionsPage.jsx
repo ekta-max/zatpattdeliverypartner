@@ -1,3 +1,5 @@
+//src\pages\PermissionsPage.jsx
+
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -7,9 +9,12 @@ import {
   Bell,
   CheckCircle,
 } from "lucide-react";
+ import { updateDeliveryPartnerPermissions } from "../Services/deliveryPartner";
+
 
 export default function PermissionsPage() {
   const navigate = useNavigate();
+
 
   // ✅ ALL PERMISSIONS GRANTED (READ-ONLY)
   const permissions = {
@@ -19,15 +24,28 @@ export default function PermissionsPage() {
   notifications: "granted",
 };
 
-  const handleContinue = () => {
-    // save mock permission state
+  const handleContinue = async () => {
+  console.log("Button clicked ✅");
+
+  try {
+    await updateDeliveryPartnerPermissions();
+
+    console.log("Permissions sent ✅");
+
+    // optional: save locally
     localStorage.setItem(
       "delivery_permissions",
       JSON.stringify(permissions)
     );
 
-    navigate("/language");
-  };
+    // 👉 move next
+    navigate("/location-picker");
+
+  } catch (error) {
+    console.error("Permission API failed ❌", error);
+    alert("Failed to update permissions");
+  }
+};
 
   return (
     <div className="min-h-screen bg-white flex flex-col">

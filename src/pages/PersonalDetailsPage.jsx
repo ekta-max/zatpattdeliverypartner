@@ -1,13 +1,28 @@
+//src\pages\PersonalDetailsPage.jsx
+
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, HelpCircle } from "lucide-react";
 import AadhaarSample from "../assets/aadhaar-sample.png";
 import Confetti from "react-confetti";
 import PANsample from "../assets/pan-sample.png";
+import { DEV_MODE } from "../config/appConfig";
+import { submitPersonalDetailsBasic } from "../Services/personalDetails";
+import { verifyAadhaar } from "../Services/personalDetails";
+import { verifyPan } from "../Services/personalDetails";
+import { submitBankDetails } from "../Services/personalDetails";
+import { uploadSelfie } from "../Services/personalDetails";
+
+
 
 
 export default function PersonalDetailsPage() {
   const navigate = useNavigate();
+ 
+  const [aadhaarFile, setAadhaarFile] = useState(null);
+  const [panFile, setPanFile] = useState(null);
+  const [email, setEmail] = useState("");
+  const [dob, setDob] = useState("");
 
   useEffect(() => {
   const progress = JSON.parse(
@@ -20,9 +35,14 @@ export default function PersonalDetailsPage() {
   }
 
   // ❌ Do not allow without work details
-  if (progress?.work_details !== "completed") {
-    navigate("/work-details", { replace: true });
-  }
+  // if (progress?.work_details !== "completed") {
+  //   navigate("/work-details", { replace: true });
+  // }
+
+
+ if (!DEV_MODE && progress?.work_details !== "completed") {
+  navigate("/onboarding-steps");
+}
 }, [navigate]);
 
   const [step, setStep] = useState(1);
@@ -35,19 +55,19 @@ export default function PersonalDetailsPage() {
 
   /* AADHAAR */
   const [aadhaar, setAadhaar] = useState("");
-  const [aadhaarOtp, setAadhaarOtp] = useState("");
-  const [aadhaarVerified, setAadhaarVerified] = useState(false);
-  const [aadhaarStage, setAadhaarStage] = useState("number"); 
+  // const [aadhaarOtp, setAadhaarOtp] = useState("");
+  // const [aadhaarVerified, setAadhaarVerified] = useState(false);
+  // const [aadhaarStage, setAadhaarStage] = useState("number"); 
   // number | otp | verified
 
   const [aadhaarError, setAadhaarError] = useState("");
-  const [otpTimer, setOtpTimer] = useState(30);
+  // const [otpTimer, setOtpTimer] = useState(30);
 
-  useEffect(() => {
-    if (aadhaarStage !== "otp" || otpTimer <= 0) return;
-    const t = setInterval(() => setOtpTimer((s) => s - 1), 1000);
-    return () => clearInterval(t);
-  }, [aadhaarStage, otpTimer]);
+  // useEffect(() => {
+  //   if (aadhaarStage !== "otp" || otpTimer <= 0) return;
+  //   const t = setInterval(() => setOtpTimer((s) => s - 1), 1000);
+  //   return () => clearInterval(t);
+  // }, [aadhaarStage, otpTimer]);
 
   const [showAadhaarPopup, setShowAadhaarPopup] = useState(false);
 
@@ -96,7 +116,9 @@ export default function PersonalDetailsPage() {
   const isStep1Valid =
   firstName.trim().length >= 2 &&
   lastName.trim().length >= 2 &&
-  gender !== "";
+  gender !== "" &&
+  email.includes("@") &&
+  dob.length > 0;
 
 
   return (
@@ -148,6 +170,23 @@ export default function PersonalDetailsPage() {
             setValue={(v) => setLastName(v.replace(/[^a-zA-Z]/g, ""))}
             />
 
+            <Input
+              label="Email"
+              value={email}
+              setValue={setEmail}
+            />
+
+         <div className="mb-4">
+        <label className="text-sm text-gray-600">Date of Birth</label>
+
+        <input
+          type="date"
+          value={dob}
+          onChange={(e) => setDob(e.target.value)}
+          className="w-full border rounded-xl px-4 py-3 mt-1 focus:ring-2 focus:ring-orange-500 outline-none"
+        />
+      </div>
+
             <p className="mt-4 font-semibold font-medium">Select your gender</p>
             <div className="flex gap-4 mt-3">
             <button
@@ -173,7 +212,28 @@ export default function PersonalDetailsPage() {
             </div>
 
            <button
-        onClick={() => setStep(2)}
+
+        onClick={async () => {
+  if (!isStep1Valid) return;
+
+  try {
+    await submitPersonalDetailsBasic({
+      first_name: firstName,
+      last_name: lastName,
+      email,
+      dob,
+      gender,
+    });
+
+    console.log("Personal basic saved ✅");
+
+    setStep(2); // move forward
+  } catch (err) {
+    console.error("Personal API error ❌", err);
+    alert("Failed to save personal details");
+  }
+}}
+
         disabled={!isStep1Valid}
         className={`mt-8 w-full py-3 rounded-xl font-semibold transition ${
             isStep1Valid
@@ -205,209 +265,202 @@ export default function PersonalDetailsPage() {
         )}
 
        {/* STEP 3 – AADHAAR */}
-        {step === 3 && (
-            <div className="flex flex-col h-full">
-            {/* ===== CONTENT ===== */}
-        <div className="flex-1">
-            {/* ---------- AADHAAR NUMBER ---------- */}
-            {aadhaarStage === "number" && (
-            <>
-          {/* Fixed Aadhaar Preview Image */}
-          <div className="mb-4">
-            <img
-              src={AadhaarSample}
-              alt="Aadhaar sample"
-              className="w-full rounded-xl border"
-            />
-          </div>
+       {/* STEP 3 – AADHAAR */}
+{step === 3 && (
+  <div className="flex flex-col h-full">
+    <div className="flex-1">
 
-          <h2 className="text-lg font-semibold mb-1">
-            Enter your Aadhaar details
-          </h2>
-          <p className="text-sm text-gray-500 mb-4">
-            Upload your own documents for a faster process
-          </p>
+      {/* IMAGE */}
+      <div className="mb-4">
+        <img
+          src={AadhaarSample}
+          alt="Aadhaar sample"
+          className="w-full rounded-xl border"
+        />
+      </div>
 
-          <Input
-            label="Aadhaar number"
-            value={aadhaar}
-            setValue={(v) => {
-              setAadhaar(v.replace(/\D/g, ""));
-              setAadhaarError("");
-            }}
-            maxLength={12}
-          />
+      <h2 className="text-lg font-semibold mb-1">
+        Enter your Aadhaar details
+      </h2>
 
-          {aadhaarError && (
-            <p className="text-xs text-red-500 mt-1">
-              {aadhaarError}
-            </p>
-          )}
-        </>
+      <p className="text-sm text-gray-500 mb-4">
+        Upload your Aadhaar card for verification
+      </p>
+
+      {/* AADHAAR NUMBER */}
+      <Input
+        label="Aadhaar number"
+        value={aadhaar}
+        setValue={(v) => {
+          setAadhaar(v.replace(/\D/g, ""));
+          setAadhaarError("");
+        }}
+        maxLength={12}
+      />
+
+      {/* FILE UPLOAD */}
+      <div className="mb-4">
+        <label className="text-sm text-gray-600">
+          Upload Aadhaar Card
+        </label>
+
+        <input
+          type="file"
+          accept="image/*,.pdf"
+          onChange={(e) => setAadhaarFile(e.target.files[0])}
+          className="w-full mt-2"
+        />
+         
+         {aadhaarFile && (
+        <p className="text-xs text-green-600 mt-1">
+          File selected: {aadhaarFile.name}
+        </p>
       )}
+      </div>
 
-      {/* ---------- AADHAAR OTP ---------- */}
-      {aadhaarStage === "otp" && (
-        <>
-          <h2 className="text-lg font-semibold mb-4">
-            Enter OTP shared on your registered mobile number
-          </h2>
-
-          <Input
-            label="Aadhaar OTP"
-            value={aadhaarOtp}
-            setValue={(v) => setAadhaarOtp(v.replace(/\D/g, ""))}
-            maxLength={6}
-          />
-
-          <div className="text-sm text-gray-500 mt-2">
-            {otpTimer > 0 ? (
-              <>Resend OTP in 00:{otpTimer.toString().padStart(2, "0")}</>
-            ) : (
-              <button
-                onClick={() => setOtpTimer(30)}
-                className="text-orange-500 font-medium"
-              >
-                Resend OTP
-              </button>
-            )}
-          </div>
-        </>
-      )}
-
-      {/* ---------- VERIFIED ---------- */}
-      {aadhaarStage === "verified" && (
-        <div className="flex flex-col items-center justify-center mt-10 text-center">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-            <span className="text-green-600 text-2xl">✔</span>
-          </div>
-          <h3 className="text-lg font-semibold">
-            Aadhaar details verified
-          </h3>
-        </div>
+      {/* ERROR */}
+      {aadhaarError && (
+        <p className="text-xs text-red-500 mt-1">
+          {aadhaarError}
+        </p>
       )}
     </div>
 
-    {/* ===== FIXED BOTTOM BUTTON ===== */}
+    {/* BUTTON */}
     <div className="pb-4">
-      {aadhaarStage === "number" && (
-        <button
-          onClick={() => {
-            if (aadhaar.length !== 12) {
-              setAadhaarError("Aadhaar number must be 12 digits");
-              return;
-            }
-            setAadhaarStage("otp");
-            setOtpTimer(30);
-          }}
-          disabled={aadhaar.length !== 12}
-          className={`w-full py-3 rounded-xl font-semibold transition ${
-            aadhaar.length === 12
-              ? "bg-orange-500 text-white"
-              : "bg-gray-200 text-gray-400 cursor-not-allowed"
-          }`}
-        >
-          Continue
-        </button>
-      )}
+      <button
+        onClick={async () => {
+          if (aadhaar.length !== 12) {
+            setAadhaarError("Aadhaar must be 12 digits");
+            return;
+          }
 
-      {aadhaarStage === "otp" && (
-        <button
-          onClick={() => {
-           if (aadhaarOtp.length === 6) {
-           setShowAadhaarPopup(true);
-        }
+          if (!aadhaarFile) {
+            setAadhaarError("Please upload Aadhaar file");
+            return;
+          }
 
-          }}
-          disabled={aadhaarOtp.length !== 6}
-          className={`w-full py-3 rounded-xl font-semibold transition ${
-            aadhaarOtp.length === 6
-              ? "bg-orange-500 text-white"
-              : "bg-gray-200 text-gray-400 cursor-not-allowed"
-          }`}
-        >
-          Continue
-        </button>
-      )}
+          try {
+           await verifyAadhaar({
+            adhaar_card_number: aadhaar,
+            file: aadhaarFile,
+          });
 
-      {aadhaarStage === "verified" && (
-        <button
-          onClick={() => setStep(4)}
-          className="w-full py-3 rounded-xl font-semibold bg-orange-500 text-white"
-        >
-          Next
-        </button>
-      )}
+            console.log("Aadhaar verified ✅");
+
+            setShowAadhaarPopup(true);
+
+          } catch (err) {
+            console.error("Aadhaar API error ❌", err);
+            setAadhaarError("Verification failed");
+          }
+        }}
+        className="w-full py-3 rounded-xl font-semibold bg-orange-500 text-white"
+      >
+        Verify Aadhaar
+      </button>
     </div>
   </div>
 )}
 
        {/* STEP 4 – PAN */}
-    {step === 4 && (
-    <div className="flex flex-col h-full">
-    {/* ===== CONTENT ===== */}
+        {step === 4 && (
+  <div className="flex flex-col h-full">
     <div className="flex-1">
-      {panStage === "number" && (
-        <>
-          {/* Fixed PAN Preview */}
-          <div className="mb-4">
-            <img
-              src={PANsample}
-              alt="PAN sample"
-              className="w-full rounded-xl border"
-            />
-          </div>
+      
+      {/* IMAGE */}
+      <div className="mb-4">
+        <img
+          src={PANsample}
+          alt="PAN sample"
+          className="w-full rounded-xl border"
+        />
+      </div>
 
-          <h2 className="text-lg font-semibold mb-1">
-            Enter your PAN details
-          </h2>
-          <p className="text-sm text-gray-500 mb-4">
-            PAN is required for tax and payout purposes
+      <h2 className="text-lg font-semibold mb-1">
+        Enter your PAN details
+      </h2>
+
+      <p className="text-sm text-gray-500 mb-4">
+        Upload your PAN card for verification
+      </p>
+
+      {/* PAN NUMBER */}
+      <Input
+        label="PAN number"
+        value={pan}
+        setValue={(v) => {
+          setPan(v.toUpperCase().replace(/[^A-Z0-9]/g, ""));
+          setPanError("");
+        }}
+        maxLength={10}
+      />
+
+      {/* FILE UPLOAD */}
+      <div className="mb-4">
+        <label className="text-sm text-gray-600">
+          Upload PAN Card
+        </label>
+
+        <input
+          type="file"
+          accept="image/*,.pdf"
+          onChange={(e) => setPanFile(e.target.files[0])}
+          className="w-full mt-2"
+        />
+
+        {panFile && (
+          <p className="text-xs text-green-600 mt-1">
+            File selected: {panFile.name}
           </p>
+        )}
+      </div>
 
-          <Input
-            label="PAN number"
-            value={pan}
-            setValue={(v) => {
-              setPan(v.toUpperCase().replace(/[^A-Z0-9]/g, ""));
-              setPanError("");
-            }}
-            maxLength={10}
-          />
-
-          {panError && (
-            <p className="text-xs text-red-500 mt-1">
-              {panError}
-            </p>
-          )}
-        </>
+      {/* ERROR */}
+      {panError && (
+        <p className="text-xs text-red-500 mt-1">
+          {panError}
+        </p>
       )}
     </div>
 
-    {/* ===== FIXED BOTTOM BUTTON ===== */}
+    {/* BUTTON */}
     <div className="pb-4">
-      {panStage === "number" && (
-        <button
-          onClick={() => {
-            if (pan.length !== 10) {
-              setPanError("PAN number must be 10 characters");
-              return;
-            }
+      <button
+        onClick={async () => {
+          if (pan.length !== 10) {
+            setPanError("PAN must be 10 characters");
+            return;
+          }
+
+          if (!panFile) {
+            setPanError("Please upload PAN file");
+            return;
+          }
+
+          try {
+            await verifyPan({
+              pan_card_number: pan,
+              file: panFile,
+            });
+
+            console.log("PAN verified ✅");
+
             setShowPanPopup(true);
-          }}
-          disabled={pan.length !== 10}
-          className={`w-full py-3 rounded-xl font-semibold transition ${
-            pan.length === 10
-              ? "bg-orange-500 text-white"
-              : "bg-gray-200 text-gray-400 cursor-not-allowed"
-          }`}
-        >
-          Continue
-        </button>
-      )}
+
+          } catch (err) {
+            console.error("PAN API error ❌", err);
+            setPanError("Verification failed");
+          }
+        }}
+        className="w-full py-3 rounded-xl font-semibold bg-orange-500 text-white"
+      >
+        Verify PAN
+      </button>
     </div>
   </div>
 )}
+
 
 {/* STEP 5 – BANK ACCOUNT */}
 {step === 5 && (
@@ -464,23 +517,39 @@ export default function PersonalDetailsPage() {
     {/* ✅ VERIFY BUTTON */}
     <button
       disabled={!isBankFormValid}
-      onClick={() => {
-        if (!bank || !account || !confirmAccount || !ifsc) {
-          setBankError("All fields are required");
-          return;
-        }
-        if (account !== confirmAccount) {
-          setBankError("Account numbers do not match");
-          return;
-        }
-        if (ifsc.length !== 11) {
-          setBankError("Invalid IFSC code");
-          return;
-        }
+      onClick={async () => {
+  if (!bank || !account || !confirmAccount || !ifsc) {
+    setBankError("All fields are required");
+    return;
+  }
 
-        setBankError("");
-        setStep(6); // 👉 move to selfie
-      }}
+  if (account !== confirmAccount) {
+    setBankError("Account numbers do not match");
+    return;
+  }
+
+  if (ifsc.length !== 11) {
+    setBankError("Invalid IFSC code");
+    return;
+  }
+
+  try {
+    await submitBankDetails({
+      bank_account_number: account,
+      ifsc_code: ifsc,
+      account_holder_name: `${firstName} ${lastName}`, // ✅ important
+    });
+
+    console.log("Bank details saved ✅");
+
+    setBankError("");
+    setStep(6); // 👉 move to selfie
+
+  } catch (err) {
+    console.error("Bank API error ❌", err);
+    setBankError("Failed to save bank details");
+  }
+}}
       className={`mt-6 w-full py-3 rounded-xl font-semibold transition ${
         isBankFormValid
           ? "bg-orange-500 text-white"
@@ -564,7 +633,8 @@ export default function PersonalDetailsPage() {
 
             canvas.toBlob((blob) => {
             if (!blob) return;
-            setSelfieFile(blob);
+            const file = new File([blob], "selfie.jpg", { type: "image/jpeg" });
+            setSelfieFile(file);
             setSelfieStage("preview");
             }, "image/jpeg");
 
@@ -620,39 +690,57 @@ export default function PersonalDetailsPage() {
     {selfieStage === "preview" && (
       <div className="pb-4">
         <button
-          onClick={async () => {
-  // SAVE PERSONAL DETAILS
-  localStorage.setItem(
-    "personal_details",
-    JSON.stringify({
-      firstName,
-      lastName,
-      gender,
-      referral,
-      aadhaar_last4: aadhaar.slice(-4),
-      pan,
-      bank,
-      account,
-      ifsc,
-    })
-  );
+         onClick={async () => {
+  if (!selfieFile) {
+    alert("Please capture selfie");
+    return;
+  }
 
-  // UPDATE ONBOARDING PROGRESS
-          const existing =
-            JSON.parse(localStorage.getItem("onboarding_progress")) || {};
+  try {
+    // ✅ CALL SELFIE API
+    await uploadSelfie({
+      file: selfieFile,
+    });
 
-          localStorage.setItem(
-            "onboarding_progress",
-            JSON.stringify({
-              ...existing,
-              personal_details: "completed",
-              kit_ordered: false,
-            })
-          );
+    console.log("Selfie uploaded ✅");
 
-          // NEXT STEP → PARTNER KIT
-          navigate("/order-partner-kit", { replace: true });
-        }}
+    // ✅ SAVE LOCAL DATA
+    localStorage.setItem(
+      "personal_details",
+      JSON.stringify({
+        firstName,
+        lastName,
+        gender,
+        referral,
+        aadhaar_last4: aadhaar.slice(-4),
+        pan,
+        bank,
+        account,
+        ifsc,
+      })
+    );
+
+    // ✅ UPDATE PROGRESS
+    const existing =
+      JSON.parse(localStorage.getItem("onboarding_progress")) || {};
+
+    localStorage.setItem(
+      "onboarding_progress",
+      JSON.stringify({
+        ...existing,
+        personal_details: "completed",
+        kit_ordered: false,
+      })
+    );
+
+    // ✅ NEXT PAGE
+    navigate("/order-partner-kit", { replace: true });
+
+  } catch (err) {
+    console.error("Selfie API error ❌", err);
+    alert("Failed to upload selfie");
+  }
+}}
          className="w-full py-3 rounded-xl font-semibold bg-orange-500 text-white"
         >
           Continue
@@ -714,7 +802,6 @@ export default function PersonalDetailsPage() {
       <button
         onClick={() => {
           setShowAadhaarPopup(false);
-          setAadhaarStage("verified");
           setStep(4);
         }}
         className="mt-6 w-full py-3 rounded-xl font-semibold bg-orange-500 text-white"

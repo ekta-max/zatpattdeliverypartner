@@ -1,3 +1,5 @@
+//src\pages\TrainingIntroPage.jsx
+
 import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { CheckCircle, Target } from "lucide-react";

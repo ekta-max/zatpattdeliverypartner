@@ -1,3 +1,5 @@
+//src\pages\TrainingCoursePage.jsx
+
 import React, { useEffect, useState } from "react";
 import { Lock, PlayCircle, CheckCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";

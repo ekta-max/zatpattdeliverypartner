@@ -1,49 +1,50 @@
+//src/pages/WorkDetailsPage.jsx
+
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, HelpCircle, MapPin } from "lucide-react";
-
-/* ---------------- MOCK DATA ---------------- */
-
-const AVAILABLE_CITIES = {
-  Mumbai: {
-    zones: [
-      {
-        name: "Marine Lines",
-        radius: "5 km",
-        store: "ZatPatt Darkstore – Marine Lines",
-      },
-      {
-        name: "Andheri West",
-        radius: "6 km",
-        store: "ZatPatt Darkstore – Andheri",
-      },
-    ],
-  },
-};
-
-const ALL_CITIES = [
-  "Mumbai",
-  "Delhi",
-  "Pune",
-  "Bangalore",
-  "Ahmedabad",
-];
+import { ArrowLeft, HelpCircle } from "lucide-react";
+import { DEV_MODE } from "../config/appConfig";
+import {
+  getCities,
+  submitWorkDetails,
+} from "../Services/workdetails"; // ✅ FIXED PATH
 
 export default function WorkDetailsPage() {
   const navigate = useNavigate();
 
   const [step, setStep] = useState(1);
-  const [locationAllowed, setLocationAllowed] = useState(false);
+
+  const [cities, setCities] = useState([]);
+  const [loadingCities, setLoadingCities] = useState(true);
 
   const [city, setCity] = useState(null);
-  const [zone, setZone] = useState(null);
   const [vehicle, setVehicle] = useState(null);
 
-  const [showCityList, setShowCityList] = useState(false);
-  const [cityUnavailable, setCityUnavailable] = useState(false);
-
-  /* 🔥 PREVENT RE-ENTRY AFTER COMPLETION */
+  const VEHICLES = [
+  { label: "Bike", value: "bike" },
+  { label: "Electric Bike", value: "electric_bike" },
+  { label: "Bicycle", value: "bicycle" },
+];
+  /* ---------------- FETCH CITIES ---------------- */
   useEffect(() => {
+    const fetchCities = async () => {
+      try {
+        const data = await getCities();
+        setCities(data || []);
+      } catch (err) {
+        console.error("City API error ❌", err);
+      } finally {
+        setLoadingCities(false);
+      }
+    };
+
+    fetchCities();
+  }, []);
+
+  /* ---------------- LOCK (DISABLED IN DEV) ---------------- */
+  useEffect(() => {
+    if (DEV_MODE) return;
+
     const progress = JSON.parse(
       localStorage.getItem("onboarding_progress")
     );
@@ -53,18 +54,24 @@ export default function WorkDetailsPage() {
     }
   }, [navigate]);
 
-  /* ---------------- LOCATION CHECK ---------------- */
-  useEffect(() => {
-    setTimeout(() => setLocationAllowed(false), 500);
-  }, []);
+  const TOTAL_STEPS = 2;
 
-  const detectCity = () => {
-    const detectedCity = "Mumbai";
-    if (!AVAILABLE_CITIES[detectedCity]) {
-      setCityUnavailable(true);
-    } else {
-      setCity(detectedCity);
-      setStep(2);
+  /* ---------------- SUBMIT ---------------- */
+  const handleSubmit = async () => {
+    if (!city || !vehicle) return;
+
+    try {
+     await submitWorkDetails({
+      city: city.id || city, // 👈 send ID if exists
+      vehicle_type: vehicle,
+    });
+
+      console.log("Work details saved ✅");
+
+      navigate("/onboarding-steps");
+    } catch (err) {
+      console.error("Work details API error ❌", err);
+      alert("Failed to save work details");
     }
   };
 
@@ -83,109 +90,64 @@ export default function WorkDetailsPage() {
         <div className="h-1 bg-gray-200 rounded">
           <div
             className="h-1 bg-orange-500 rounded transition-all"
-            style={{ width: `${(step / 3) * 100}%` }}
+            style={{ width: `${(step / TOTAL_STEPS) * 100}%` }}
           />
         </div>
       </div>
 
       {/* CONTENT */}
       <div className="flex-1 px-4 pt-6">
-        {/* STEP 1 */}
+        
+        {/* STEP 1 → CITY */}
         {step === 1 && (
           <>
-            <h2 className="text-lg font-semibold mb-2">
+            <h2 className="text-lg font-semibold mb-4">
               Select City
             </h2>
 
-            {!cityUnavailable ? (
-              <>
-                <button
-                  onClick={detectCity}
-                  className="w-full border border-orange-400 rounded-xl p-4 flex items-center gap-3"
-                >
-                  <MapPin className="text-orange-500" />
-                  <span className="font-medium">
-                    Auto detect my city
-                  </span>
-                </button>
-
-                <button
-                  onClick={() => setShowCityList(true)}
-                  className="mt-4 text-orange-500 font-medium"
-                >
-                  Change city
-                </button>
-              </>
+            {loadingCities ? (
+              <p>Loading cities...</p>
             ) : (
-              <div className="text-center mt-10">
-                <MapPin size={48} className="mx-auto text-orange-500 mb-4" />
-                <p className="font-semibold">
-                  Not available in your city
-                </p>
-                <button
+              Array.isArray(cities) ? (
+              cities.map((c) => (
+                <div
+                  key={c.id || c.name}
                   onClick={() => {
-                    setCityUnavailable(false);
-                    setShowCityList(true);
+                    setCity(c); // store full object
+                    setStep(2);
                   }}
-                  className="mt-3 text-orange-500 font-medium"
+                  className="border rounded-xl p-4 mb-3 cursor-pointer hover:bg-orange-50"
                 >
-                  Change City
-                </button>
-              </div>
+                  {c.name || c}
+                </div>
+              ))
+            ) : (
+              <p>No cities found</p>
+            )
             )}
           </>
         )}
 
-        {/* STEP 2 */}
-        {step === 2 && city && (
+        {/* STEP 2 → VEHICLE */}
+        {step === 2 && (
           <>
             <h2 className="text-lg font-semibold mb-4">
-              Select Zone
+              Select Vehicle Type
             </h2>
 
-            {AVAILABLE_CITIES[city].zones.map((z) => (
+            {VEHICLES.map((v) => (
               <div
-                key={z.name}
-                onClick={() => {
-                  setZone(z);
-                  setStep(3);
-                }}
-                className="border rounded-xl p-4 mb-3 cursor-pointer"
+                key={v.value}
+                onClick={() => setVehicle(v.value)} // ✅ send correct value
+                className={`border rounded-xl p-4 mb-3 cursor-pointer ${
+                  vehicle === v.value
+                    ? "border-orange-500 bg-orange-50"
+                    : ""
+                }`}
               >
-                <p className="font-medium">{z.name}</p>
-                <p className="text-sm text-gray-500">
-                  Radius: {z.radius}
-                </p>
-                <p className="text-xs text-gray-400">
-                  {z.store}
-                </p>
+                {v.label} {/* 👈 user-friendly text */}
               </div>
             ))}
-          </>
-        )}
-
-        {/* STEP 3 */}
-        {step === 3 && (
-          <>
-            <h2 className="text-lg font-semibold mb-4">
-              Select vehicle type
-            </h2>
-
-            {["Petrol Motorcycle", "Electric Motorcycle", "Bicycle"].map(
-              (v) => (
-                <div
-                  key={v}
-                  onClick={() => setVehicle(v)}
-                  className={`border rounded-xl p-4 mb-3 cursor-pointer ${
-                    vehicle === v
-                      ? "border-orange-500 bg-orange-50"
-                      : ""
-                  }`}
-                >
-                  {v}
-                </div>
-              )
-            )}
           </>
         )}
       </div>
@@ -193,32 +155,10 @@ export default function WorkDetailsPage() {
       {/* CTA */}
       <div className="p-4">
         <button
-          disabled={step < 3 || !vehicle}
-          onClick={() => {
-            // 🔥 SAVE DATA
-            localStorage.setItem(
-              "work_details",
-              JSON.stringify({ city, zone, vehicle })
-            );
-
-            // 🔥 UPDATE PROGRESS
-            const existing =
-              JSON.parse(localStorage.getItem("onboarding_progress")) || {};
-
-            localStorage.setItem(
-              "onboarding_progress",
-              JSON.stringify({
-                ...existing,
-                work_details: "completed",
-                personal_details: "pending",
-                kit_ordered: false,
-              })
-            );
-
-            navigate("/onboarding-steps");
-          }}
+          disabled={!city || !vehicle}
+          onClick={handleSubmit}
           className={`w-full py-3 rounded-xl font-semibold text-white ${
-            step === 3 && vehicle
+            city && vehicle
               ? "bg-orange-500"
               : "bg-gray-300"
           }`}

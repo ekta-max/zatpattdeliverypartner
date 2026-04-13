@@ -1,3 +1,5 @@
+//src\pages\PartnerKitOrderPage.jsx
+
 import React, { useState } from "react";
 import { ArrowLeft, HelpCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -6,6 +8,9 @@ import { useEffect } from "react";
 import KitImage from "../assets/partner-kit.png";
 import TshirtModel from "../assets/tshirt-model.png";
 import DeliveryConfirm from "../assets/delivery-confirm.png";
+import { DEV_MODE } from "../config/appConfig";
+import { submitPartnerKit } from "../Services/partnerkit";
+
 
 const SIZES = ["S", "M", "L", "XL", "2XL"];
 
@@ -33,9 +38,15 @@ export default function PartnerKitOrderPage() {
   );
 
   // ❌ Block access if personal details not done
-  if (progress?.personal_details !== "completed") {
-    navigate("/personal-details", { replace: true });
-  }
+  // if (progress?.personal_details !== "completed") {
+  //   navigate("/personal-details", { replace: true });
+  // }
+
+
+  if (!DEV_MODE && progress?.personal_details !== "completed") {
+  navigate("/personal-details");
+}
+
 
   // ❌ Block access if kit already ordered
   if (progress?.kit_ordered === true) {
@@ -291,31 +302,50 @@ export default function PartnerKitOrderPage() {
             />
 
             <button
-             onClick={() => {
-            // SAVE KIT DETAILS
-            localStorage.setItem(
-              "partner_kit",
-              JSON.stringify({
-                tshirt_size: size,
-                address,
-                payment_mode: paymentMode,
-              })
-            );
+            onClick={async () => {
+  if (!size) {
+    alert("Please select T-shirt size");
+    return;
+  }
 
-            // UPDATE ONBOARDING PROGRESS
-            const existing =
-              JSON.parse(localStorage.getItem("onboarding_progress")) || {};
+  try {
+    // ✅ CALL NEW API
+    await submitPartnerKit({
+      tshirt_size: size,
+    });
 
-            localStorage.setItem(
-              "onboarding_progress",
-              JSON.stringify({
-                ...existing,
-                kit_ordered: true,
-              })
-            );
+    console.log("Partner kit submitted ✅");
 
-            navigate("/payment-success", { replace: true });
-          }}
+    // ✅ SAVE LOCAL DATA
+    localStorage.setItem(
+      "partner_kit",
+      JSON.stringify({
+        tshirt_size: size,
+        address,
+        payment_mode: paymentMode,
+      })
+    );
+
+    // ✅ UPDATE PROGRESS
+    const existing =
+      JSON.parse(localStorage.getItem("onboarding_progress")) || {};
+
+    localStorage.setItem(
+      "onboarding_progress",
+      JSON.stringify({
+        ...existing,
+        kit_ordered: true,
+      })
+    );
+
+    // ✅ REDIRECT
+    navigate("/payment-success", { replace: true });
+
+  } catch (err) {
+    console.error("Partner kit API error ❌", err);
+    alert("Failed to submit partner kit");
+  }
+}}
 
               className="mt-8 w-full bg-orange-500 text-white py-3 rounded-xl font-semibold"
             >
