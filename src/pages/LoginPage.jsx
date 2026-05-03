@@ -1,13 +1,15 @@
-//src\pages\loginpage.jsx
+// src/pages/loginpage.jsx
 
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { requestOtp } from "../Services/auth";
 
 export default function LoginPage() {
   const navigate = useNavigate();
 
   const [mobile, setMobile] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!mobile) setError("");
@@ -18,14 +20,28 @@ export default function LoginPage() {
 
   const isValid = /^[6-9]\d{9}$/.test(mobile);
 
-  const handleContinue = () => {
-    if (!isValid) return;
+  const handleContinue = async () => {
+    if (!isValid || loading) return;
 
-    // MOCK OTP FLOW
-    localStorage.setItem("mock_phone", mobile);
-    localStorage.setItem("mock_otp", "123456");
+    try {
+      setLoading(true);
 
-    navigate("/otp", { state: { phone: mobile } });
+      const res = await requestOtp(mobile);
+
+      console.log("OTP API ✅", res);
+
+      localStorage.setItem("login_mobile", mobile);
+
+      navigate("/otp", {
+        state: { phone: mobile },
+      });
+
+    } catch (err) {
+      console.error("OTP API error ❌", err);
+      alert("Failed to send OTP");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -35,6 +51,7 @@ export default function LoginPage() {
         <div className="text-4xl font-extrabold text-orange-500">
           ZatPatt
         </div>
+
         <div className="mt-1 text-sm font-semibold text-gray-800 tracking-wide">
           Delivery Partner
         </div>
@@ -45,6 +62,7 @@ export default function LoginPage() {
         <h2 className="text-xl font-semibold text-gray-900">
           Sign in to your account
         </h2>
+
         <p className="text-sm text-gray-500 mt-1">
           Login or create an account
         </p>
@@ -65,11 +83,12 @@ export default function LoginPage() {
             focus-within:ring-2 focus-within:ring-orange-500
           `}
         >
-          {/* FLAG */}
           <span className="text-lg mr-2">🇮🇳</span>
+
           <span className="text-sm font-semibold text-gray-800">
             +91
           </span>
+
           <div className="mx-3 h-5 w-px bg-gray-300" />
 
           <input
@@ -79,7 +98,9 @@ export default function LoginPage() {
             placeholder="Enter mobile number"
             value={mobile}
             onChange={(e) =>
-              setMobile(e.target.value.replace(/\D/g, ""))
+              setMobile(
+                e.target.value.replace(/\D/g, "")
+              )
             }
             maxLength={10}
             className="flex-1 bg-transparent outline-none text-sm text-gray-900"
@@ -93,31 +114,34 @@ export default function LoginPage() {
         )}
       </div>
 
-      {/* PUSH CONTENT UP */}
       <div className="flex-1" />
 
-      {/* FOOTER ACTION AREA */}
+      {/* FOOTER */}
       <div className="pb-6">
         <p className="text-[11px] text-gray-500 text-center mb-3">
           By continuing you agree to our
-          <span className="text-orange-500 font-medium"> Terms </span>&
-          <span className="text-orange-500 font-medium"> Privacy Policy</span>
+          <span className="text-orange-500 font-medium">
+            {" "}Terms{" "}
+          </span>
+          &
+          <span className="text-orange-500 font-medium">
+            {" "}Privacy Policy
+          </span>
         </p>
 
         <button
           onClick={handleContinue}
-          disabled={!isValid}
+          disabled={!isValid || loading}
           className={`
-            w-full py-3 rounded-xl font-semibold
-            transition
+            w-full py-3 rounded-xl font-semibold transition
             ${
-              isValid
+              isValid && !loading
                 ? "bg-orange-500 text-white active:bg-orange-600"
                 : "bg-gray-200 text-gray-400 cursor-not-allowed"
             }
           `}
         >
-          Continue
+          {loading ? "Sending OTP..." : "Continue"}
         </button>
       </div>
     </div>

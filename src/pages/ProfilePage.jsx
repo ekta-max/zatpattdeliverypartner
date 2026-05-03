@@ -4,6 +4,10 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Download, Trash2 } from "lucide-react";
 import { LanguageContext } from "../context/LanguageContext";
 import { NotificationContext } from "../context/NotificationContext";
+import { getProfile } from "../Services/profile";
+import { updateProfile } from "../Services/profile";
+import { reportBug } from "../Services/profile";
+
 
 /**
  * ProfilePage for Delivery Partner
@@ -35,53 +39,177 @@ export default function ProfilePage() {
   const navigate = useNavigate();
   const { t } = useContext(LanguageContext || { t: (s) => s });
   const { addNotification } = useContext(NotificationContext || { addNotification: () => {} });
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [bugText, setBugText] = useState("");
+  const [showBugModal, setShowBugModal] = useState(false);
+
+
 
   // base profile structure
-  const defaultProfile = {
-    // personal info (these should come from signup flow — uneditable here)
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
+  // const defaultProfile = {
+  //   // personal info (these should come from signup flow — uneditable here)
+  //   firstName: "",
+  //   lastName: "",
+  //   email: "",
+  //   phone: "",
 
-    // extra fields
-    vehicleType: "", // i.e. Bike / Car / Cycle
-    bankMasked: "", // last 4 digits or masked display
+  //   // extra fields
+  //   vehicleType: "", // i.e. Bike / Car / Cycle
+  //   bankMasked: "", // last 4 digits or masked display
 
-    // settings
-    language: "en",
-    notifications: {
-      all: true,
-      orders: true,
-      promos: false,
-      system: true,
-    },
+  //   // settings
+  //   language: "en",
+  //   notifications: {
+  //     all: true,
+  //     orders: true,
+  //     promos: false,
+  //     system: true,
+  //   },
 
-    // documents
-    documents: {
-      license: null,
-      vehicle: null,
-      idProof: null,
-      insurance: null,
-      bankProof: null,
-    },
+  //   // documents
+  //   documents: {
+  //     license: null,
+  //     vehicle: null,
+  //     idProof: null,
+  //     insurance: null,
+  //     bankProof: null,
+  //   },
 
-    // verification overview
-    verification: {
-      status: "Not submitted", // Not submitted / Pending / Verified / Rejected
-      lastRequestedAt: null,
-    },
+  //   // verification overview
+  //   verification: {
+  //     status: "Not submitted", // Not submitted / Pending / Verified / Rejected
+  //     lastRequestedAt: null,
+  //   },
+  // };
+
+const handleReportBug = async () => {
+  if (!bugText.trim()) {
+    addNotification?.("Please enter bug details");
+    return;
+  }
+
+  try {
+    await reportBug({ report: bugText });
+
+    addNotification?.("Bug reported successfully ✅");
+    setBugText("");
+    setShowBugModal(false);
+
+  } catch (err) {
+    console.error("Bug API error ❌", err);
+    addNotification?.("Failed to report bug");
+  }
+};
+
+
+  useEffect(() => {
+  const fetchProfile = async () => {
+    try {
+      const res = await getProfile();
+
+      console.log("Profile API ✅", res);
+
+      const data = res.data || {};
+
+      // 🔥 SPLIT full_name into first + last
+      const nameParts = (data.full_name || "").split(" ");
+
+      setProfile((prev) => ({
+        ...prev,
+
+        firstName: nameParts[0] || "",
+        lastName: nameParts.slice(1).join(" ") || "",
+
+        email: data.email || "",
+        phone: data.mobile || "", // ✅ FIXED
+
+        vehicleType: data.vehicle_type || "",
+
+        bankMasked: data.bank_account_number
+          ? "****" + data.bank_account_number.slice(-4)
+          : "",
+
+        language: data.preferred_language || "en",
+
+        // 🔥 Permissions mapping (optional but good)
+        notifications: {
+          all: data.notification_permission ?? true,
+          orders: true,
+          promos: false,
+          system: true,
+        },
+
+        verification: {
+          status:
+            data.adhaar_card && data.pan_card
+              ? "Verified"
+              : "Not submitted",
+          lastRequestedAt: null,
+        },
+      }));
+    } catch (err) {
+      console.error("Profile API error ❌", err);
+    } finally {
+      setLoadingProfile(false);
+    }
   };
 
+  fetchProfile();
+}, []);
+
+const handleSaveProfile = async () => {
+  try {
+    await updateProfile({
+      vehicle_type: profile.vehicleType,
+      bank_account_number: profile.bankMasked || null,
+
+      location_permission: true, // 🔥 you can make toggle later
+      background_location_permission: false,
+      camera_permission: false,
+
+      notification_permission: profile.notifications?.all ?? true,
+    });
+
+    addNotification?.("Profile updated successfully ✅");
+
+  } catch (err) {
+    console.error("Update profile error ❌", err);
+    addNotification?.("Failed to update profile");
+  }
+};
+
+
   // load profile from localStorage
-  const [profile, setProfile] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem("partner_profile") || "{}");
-      return { ...defaultProfile, ...saved };
-    } catch (e) {
-      return defaultProfile;
-    }
-  });
+const [profile, setProfile] = useState({
+  firstName: "",
+  lastName: "",
+  email: "",
+  phone: "",
+
+  vehicleType: "",
+  bankMasked: "",
+
+  language: "en",
+  notifications: {
+    all: true,
+    orders: true,
+    promos: false,
+    system: true,
+  },
+
+  documents: {
+    license: null,
+    vehicle: null,
+    idProof: null,
+    insurance: null,
+    bankProof: null,
+  },
+
+  verification: {
+    status: "Not submitted",
+    lastRequestedAt: null,
+  },
+});
 
   // support modal & FAQ state
   const [showSupport, setShowSupport] = useState(false);
@@ -244,6 +372,16 @@ export default function ProfilePage() {
     { q: "How do I change vehicle type?", a: "Update vehicle type in this screen and Save Profile." },
   ];
 
+
+  if (loadingProfile) {
+  return (
+    <div className="h-screen flex items-center justify-center">
+      Loading profile...
+    </div>
+  );
+}
+
+
   return (
     <div className="min-h-screen bg-orange-50 flex flex-col">
       {/* Header */}
@@ -321,10 +459,9 @@ export default function ProfilePage() {
                 onChange={(e) => setProfile({ ...profile, vehicleType: e.target.value })}
               >
                 <option value="">Select vehicle</option>
+                <option value="scooter">Scooter</option>
                 <option value="bike">Bike</option>
-                <option value="car">Car</option>
-                <option value="cycle">Cycle</option>
-                <option value="walk">Walking</option>
+                <option value="bicycle">Bicycle</option>
               </select>
             </div>
 
@@ -547,20 +684,12 @@ export default function ProfilePage() {
 
   {/* Save Button */}
   <div>
-    <button
-      onClick={() => {
-        persistProfile({
-          language: profile.language,
-          notifications: profile.notifications,
-          vehicleType: profile.vehicleType,
-          bankMasked: profile.bankMasked,
-        });
-        addNotification?.("Settings saved");
-      }}
-      className="px-4 py-2 bg-orange-500 text-white rounded-md w-full font-semibold"
-    >
-      Save Profile
-    </button>
+   <button
+  onClick={handleSaveProfile}
+  className="px-4 py-2 bg-orange-500 text-white rounded-md w-full font-semibold"
+>
+  Save Profile
+</button>
   </div>
 </div>
 
@@ -570,9 +699,9 @@ export default function ProfilePage() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <button
-              onClick={() => {
-                window.location.href = "mailto:support@example.com?subject=Bug%20Report&body=Describe%20the%20issue%20here";
-              }}
+              
+              onClick={() => setShowBugModal(true)}
+              
               className="px-3 py-2 bg-red-100 rounded-md text-left"
             >
               <div className="font-medium">Report a bug</div>
@@ -651,6 +780,39 @@ export default function ProfilePage() {
           </div>
         </div>
       )}
+
+      {showBugModal && (
+  <div className="fixed inset-0 bg-orange-50 bg-opacity-40 flex items-center justify-center z-50">
+    <div className="bg-white rounded-2xl p-6 w-[90%] max-w-md">
+      
+      <h3 className="font-semibold text-lg mb-3">Report a Bug</h3>
+
+      <textarea
+        value={bugText}
+        onChange={(e) => setBugText(e.target.value)}
+        placeholder="Describe the issue..."
+        className="w-full border rounded-md p-2 h-28 text-sm"
+      />
+
+      <div className="flex justify-end gap-2 mt-4">
+        <button
+          onClick={() => setShowBugModal(false)}
+          className="px-4 py-2 bg-gray-200 rounded-md"
+        >
+          Cancel
+        </button>
+
+        <button
+          onClick={handleReportBug}
+          className="px-4 py-2 bg-orange-500 text-white rounded-md"
+        >
+          Submit
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
     </div>
   );
 }

@@ -19,18 +19,18 @@ export default function PartnerKitOrderPage() {
   const [step, setStep] = useState(1);
 
   const [size, setSize] = useState("");
-  const [paymentMode, setPaymentMode] = useState("now");
+  // const [paymentMode, setPaymentMode] = useState("now");
 
-  const [address, setAddress] = useState({
-  house: "",
-  locality: "",
-  landmark: "",
-  pincode: "",
-  city: "",
-  state: "",
-  });
+  // const [address, setAddress] = useState({
+  // house: "",
+  // locality: "",
+  // landmark: "",
+  // pincode: "",
+  // city: "",
+  // state: "",
+  // });
 
-  const progressPercent = (step / 5) * 100;
+  const progressPercent = (step / 3) * 100;
 
   useEffect(() => {
   const progress = JSON.parse(
@@ -139,7 +139,45 @@ export default function PartnerKitOrderPage() {
 
             <button
               disabled={!size}
-              onClick={() => setStep(3)}
+              onClick={async () => {
+  if (!size) return;
+
+  try {
+    await submitPartnerKit({
+      tshirt_size: size,
+    });
+
+    console.log("Partner kit submitted ✅");
+
+    // ✅ SAVE LOCAL
+    localStorage.setItem(
+      "partner_kit",
+      JSON.stringify({
+        tshirt_size: size,
+        delivery_type: "pickup",
+      })
+    );
+
+    // ✅ UPDATE PROGRESS
+    const existing =
+      JSON.parse(localStorage.getItem("onboarding_progress")) || {};
+
+    localStorage.setItem(
+      "onboarding_progress",
+      JSON.stringify({
+        ...existing,
+        kit_ordered: true,
+      })
+    );
+
+    // 👉 move to success screen
+    setStep(3);
+
+  } catch (err) {
+    console.error("Partner kit API error ❌", err);
+    alert("Failed to submit partner kit");
+  }
+}}
               className={`mt-10 w-full py-3 rounded-xl font-semibold ${
                 size
                   ? "bg-orange-500 text-white"
@@ -152,7 +190,7 @@ export default function PartnerKitOrderPage() {
         )}
 
         {/* ================= STEP 3 – ADDRESS ================= */}
-    {step === 3 && (
+    {/* {step === 3 && (
      <>
      <h2 className="text-lg font-semibold mb-4">
       Shipping address for t-shirt/bag delivery
@@ -235,10 +273,10 @@ export default function PartnerKitOrderPage() {
 </button>
 
   </>
-)}
+)} */}
 
         {/* ================= STEP 4 – CONFIRM ================= */}
-    {step === 4 && (
+    {/* {step === 4 && (
        <>
         <img
             src={DeliveryConfirm}
@@ -246,7 +284,7 @@ export default function PartnerKitOrderPage() {
         />
 
     {/* 📍 ADDRESS PREVIEW */}
-    <div className="bg-gray-50 border rounded-xl p-4 mt-4 text-sm">
+    {/* <div className="bg-gray-50 border rounded-xl p-4 mt-4 text-sm">
       <p className="font-semibold text-gray-900 mb-1">
         Deliver to this address:
       </p>
@@ -278,81 +316,123 @@ export default function PartnerKitOrderPage() {
       No, change address
     </button>
   </>
-)}
+)} */}
 
         {/* ================= STEP 5 – PAYMENT ================= */}
-        {step === 5 && (
-          <>
-            <h2 className="text-lg font-semibold mb-4">
-              Pay Onboarding Fee
-            </h2>
+{/* ================= STEP 3 – COLLECT + PAYMENT ================= */}
+{/* {step === 3 && (
+  <>
+    <h2 className="text-lg font-semibold mb-4">
+      Collect Partner Kit
+    </h2> */}
 
-            <PaymentOption
-              checked={paymentMode === "now"}
-              onClick={() => setPaymentMode("now")}
-              title="Pay Now"
-              subtitle="₹1,599 (₹400 discount)"
-            />
+    {/* 📍 INFO */}
+    {/* <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-4">
+      <p className="text-sm text-green-700 font-medium">
+        🎉 Your kit will be ready for pickup
+      </p>
+      <p className="text-xs text-gray-600 mt-1">
+        Collect from your nearest Zatpatt hub after payment
+      </p>
+    </div>
 
-            <PaymentOption
-              checked={paymentMode === "installments"}
-              onClick={() => setPaymentMode("installments")}
-              title="Pay in Installments"
-              subtitle="₹499 now"
-            />
+    {/* PAYMENT OPTIONS */}
+    {/* <h3 className="text-sm font-semibold mb-2">
+      Choose Payment Option
+    </h3>
 
-            <button
-            onClick={async () => {
-  if (!size) {
-    alert("Please select T-shirt size");
-    return;
-  }
+    <PaymentOption
+      checked={paymentMode === "now"}
+      onClick={() => setPaymentMode("now")}
+      title="Pay Now"
+      subtitle="₹1,599 (₹400 discount)"
+    />
 
-  try {
-    // ✅ CALL NEW API
-    await submitPartnerKit({
-      tshirt_size: size,
-    });
+    <PaymentOption
+      checked={paymentMode === "installments"}
+      onClick={() => setPaymentMode("installments")}
+      title="Pay in Installments"
+      subtitle="₹499 now" */}
+    
 
-    console.log("Partner kit submitted ✅");
+    {/* CTA */}
+    {/* <button
+      onClick={async () => {
+        if (!size) {
+          alert("Please select T-shirt size");
+          return;
+        }
 
-    // ✅ SAVE LOCAL DATA
-    localStorage.setItem(
-      "partner_kit",
-      JSON.stringify({
-        tshirt_size: size,
-        address,
-        payment_mode: paymentMode,
-      })
-    );
+        try {
+          // ✅ FINAL STEP API
+          await submitPartnerKit({
+            tshirt_size: size,
+          });
 
-    // ✅ UPDATE PROGRESS
-    const existing =
-      JSON.parse(localStorage.getItem("onboarding_progress")) || {};
+          console.log("Partner kit submitted ✅");
 
-    localStorage.setItem(
-      "onboarding_progress",
-      JSON.stringify({
-        ...existing,
-        kit_ordered: true,
-      })
-    );
+          // ✅ SAVE LOCAL
+          localStorage.setItem(
+            "partner_kit",
+            JSON.stringify({
+              tshirt_size: size,
+              payment_mode: paymentMode,
+              delivery_type: "pickup", // 👈 important
+            })
+          );
 
-    // ✅ REDIRECT
-    navigate("/payment-success", { replace: true });
+          // ✅ UPDATE PROGRESS
+          const existing =
+            JSON.parse(localStorage.getItem("onboarding_progress")) || {};
 
-  } catch (err) {
-    console.error("Partner kit API error ❌", err);
-    alert("Failed to submit partner kit");
-  }
-}}
+          localStorage.setItem(
+            "onboarding_progress",
+            JSON.stringify({
+              ...existing,
+              kit_ordered: true,
+            })
+          );
 
-              className="mt-8 w-full bg-orange-500 text-white py-3 rounded-xl font-semibold"
-            >
-              Proceed to Pay
-            </button>
-          </>
-        )}
+          // ✅ REDIRECT
+          navigate("/payment-success", { replace: true });
+
+        } catch (err) {
+          console.error("Partner kit API error ❌", err);
+          alert("Failed to submit partner kit");
+        }
+      }}
+      className="mt-8 w-full bg-orange-500 text-white py-3 rounded-xl font-semibold"
+    >
+      Proceed to Pay
+    </button>
+  </>
+)} */}
+
+{step === 3 && (
+  <>
+    <h2 className="text-lg font-semibold mb-4">
+      🎉 You're All Set!
+    </h2>
+
+    <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+      <p className="text-sm text-green-700 font-medium">
+        Your partner kit request has been submitted successfully
+      </p>
+
+      <p className="text-sm text-gray-700 mt-2">
+        Please collect your bag & T-shirts from the nearest
+        <span className="font-semibold"> Zatpatt office</span>
+      </p>
+    </div>
+
+    <button
+      onClick={() => navigate("/verification-pending", { replace: true })}
+      className="mt-8 w-full bg-orange-500 text-white py-3 rounded-xl font-semibold"
+    >
+      Continue
+    </button>
+  </>
+)}
       </div>
     </div>
   );

@@ -5,6 +5,8 @@ import { useNavigate } from "react-router-dom";
 import { LanguageContext } from "../context/LanguageContext";
 import { NotificationContext } from "../context/NotificationContext";
 import Confetti from "react-confetti";
+import { getDashboardData } from "../Services/dashboard";
+
 
 /**
  * Delivery partner dashboard
@@ -22,38 +24,87 @@ import Confetti from "react-confetti";
 
 const DELIVERY_PAYOUT = 20; // ₹ per delivered order (change if required)
 
-function optimizeRoute(orders, startLat, startLng) {
-  const remaining = [...orders];
-  const route = [];
-  let current = { lat: startLat, lng: startLng };
+// function optimizeRoute(orders, startLat, startLng) {
+//   const remaining = [...orders];
+//   const route = [];
+//   let current = { lat: startLat, lng: startLng };
 
-  while (remaining.length) {
-    let nearestIndex = 0;
-    let nearestDistance = Number.MAX_VALUE;
+//   while (remaining.length) {
+//     let nearestIndex = 0;
+//     let nearestDistance = Number.MAX_VALUE;
 
-    remaining.forEach((o, idx) => {
-      const dLat = current.lat - o.pickupLat;
-      const dLng = current.lng - o.pickupLng;
-      const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+//     remaining.forEach((o, idx) => {
+//       const dLat = current.lat - o.pickupLat;
+//       const dLng = current.lng - o.pickupLng;
+//       const dist = Math.sqrt(dLat * dLat + dLng * dLng);
 
-      if (dist < nearestDistance) {
-        nearestDistance = dist;
-        nearestIndex = idx;
-      }
-    });
+//       if (dist < nearestDistance) {
+//         nearestDistance = dist;
+//         nearestIndex = idx;
+//       }
+//     });
 
-    const nextOrder = remaining.splice(nearestIndex, 1)[0];
-    route.push(nextOrder);
-    current = { lat: nextOrder.dropLat, lng: nextOrder.dropLng };
-  }
+//     const nextOrder = remaining.splice(nearestIndex, 1)[0];
+//     route.push(nextOrder);
+//     current = { lat: nextOrder.dropLat, lng: nextOrder.dropLng };
+//   }
 
-  return route;
-}
+//   return route;
+// }
 
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { t } = useContext(LanguageContext);
   const { addNotification } = useContext(NotificationContext);
+  // const [dashboardData, setDashboardData] = useState(null);
+
+
+ useEffect(() => {
+  const fetchDashboard = async () => {
+    try {
+      const res = await getDashboardData();
+
+      console.log("Dashboard API ✅", res);
+
+      const d = res?.data?.[0];
+      if (!d) return;
+
+      // ✅ Earnings mapping
+      setEarnings((prev) => ({
+        ...prev,
+        daily: d.today_earning || 0,
+        total: d.total_earning || 0,
+        rating: 0,
+      }));
+
+      // ✅ Wallet mapping
+      setWallet({
+        pending: d.pending_balance || 0,
+      });
+
+      // ✅ 🔥 TRANSFORM ORDERS FOR UI
+      const formattedOrders = (d.recent_orders || []).map((o) => ({
+        id: o.order_code,
+        customer: `Customer #${o.customer}`,
+        phone: "N/A",
+        pickup: "Pickup location",
+        drop: "Delivery location",
+        eta: "—",
+        status: o.status,
+        amount: o.final_amount,
+        isLive: o.is_live,
+      }));
+
+      setOrders(formattedOrders);
+
+    } catch (err) {
+      console.error("Dashboard API error ❌", err);
+    }
+  };
+
+  fetchDashboard();
+}, []);
+
 
   // UI state
   const [locationPopup, setLocationPopup] = useState(false);
@@ -203,37 +254,37 @@ export default function DashboardPage() {
   // -------------------------
   // --- ORDER SIMULATION ---
   // -------------------------
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (!online) return;
+  // useEffect(() => {
+  //   const interval = setInterval(() => {
+  //     if (!online) return;
 
-      const newOrder = {
-        id: Date.now(),
-        customer: `Customer ${Math.floor(Math.random() * 100)}`,
-        phone: "9876543210",
-        pickup: "123 Main St, City",
-        drop: "456 Market St, City",
-        pickupLat: 19.072 + Math.random() * 0.01,
-        pickupLng: 72.877 + Math.random() * 0.01,
-        dropLat: 19.076 + Math.random() * 0.01,
-        dropLng: 72.882 + Math.random() * 0.01,
-        items: ["Item A", "Item B"],
-        status: "Assigned",
-        eta: "25 mins",
-        timestamp: new Date().toLocaleTimeString(),
-      };
+  //     const newOrder = {
+  //       id: Date.now(),
+  //       customer: `Customer ${Math.floor(Math.random() * 100)}`,
+  //       phone: "9876543210",
+  //       pickup: "123 Main St, City",
+  //       drop: "456 Market St, City",
+  //       pickupLat: 19.072 + Math.random() * 0.01,
+  //       pickupLng: 72.877 + Math.random() * 0.01,
+  //       dropLat: 19.076 + Math.random() * 0.01,
+  //       dropLng: 72.882 + Math.random() * 0.01,
+  //       items: ["Item A", "Item B"],
+  //       status: "Assigned",
+  //       eta: "25 mins",
+  //       timestamp: new Date().toLocaleTimeString(),
+  //     };
 
-      setOrders((prev) => {
-        const updated = [newOrder, ...prev];
-        localStorage.setItem("partner_orders", JSON.stringify(updated));
-        return updated;
-      });
+  //     setOrders((prev) => {
+  //       const updated = [newOrder, ...prev];
+  //       localStorage.setItem("partner_orders", JSON.stringify(updated));
+  //       return updated;
+  //     });
 
-      addNotification(`New order assigned: #${newOrder.id}`);
-    }, 15000);
+  //     addNotification(`New order assigned: #${newOrder.id}`);
+  //   }, 15000);
 
-    return () => clearInterval(interval);
-  }, [online, addNotification]);
+  //   return () => clearInterval(interval);
+  // }, [online, addNotification]);
 
   // -------------------------
   // --- UPDATE ORDER STATUS ---
@@ -284,23 +335,23 @@ export default function DashboardPage() {
   // -------------------------
   // --- NAVIGATION HELPER ---
   // -------------------------
-  const openNavigation = (ordersArr) => {
-    if (!ordersArr.length) return;
-    const first = ordersArr[0];
-    const last = ordersArr[ordersArr.length - 1];
+  // const openNavigation = (ordersArr) => {
+  //   if (!ordersArr.length) return;
+  //   const first = ordersArr[0];
+  //   const last = ordersArr[ordersArr.length - 1];
 
-    const url = `https://www.google.com/maps/dir/?api=1&origin=${first.pickupLat},${first.pickupLng}&destination=${last.dropLat},${last.dropLng}`;
-    window.open(url, "_blank");
-  };
+  //   const url = `https://www.google.com/maps/dir/?api=1&origin=${first.pickupLat},${first.pickupLng}&destination=${last.dropLat},${last.dropLng}`;
+  //   window.open(url, "_blank");
+  // };
 
   // -------------------------
   // --- OPTIMIZED ORDERS ---
   // -------------------------
-  const optimizedOrders = optimizeRoute(
-    orders.filter((o) => o.status !== "Delivered"),
-    19.072,
-    72.877
-  );
+  // const optimizedOrders = optimizeRoute(
+  //   orders.filter((o) => o.status !== "Delivered"),
+  //   19.072,
+  //   72.877
+  // );
 
   // -------------------------
   // --- GOOGLE MAP SETUP ---
@@ -387,48 +438,48 @@ export default function DashboardPage() {
   }, [online]);
 
   // Add pickup/drop markers and polyline for optimized orders (max 5)
-  useEffect(() => {
-    if (!map.current || !window.google) return;
+  // useEffect(() => {
+  //   if (!map.current || !window.google) return;
 
-    // clear old markers
-    pickupMarkers.current.forEach((m) => m.setMap(null));
-    dropMarkers.current.forEach((m) => m.setMap(null));
-    pickupMarkers.current = [];
-    dropMarkers.current = [];
+  //   // clear old markers
+  //   pickupMarkers.current.forEach((m) => m.setMap(null));
+  //   dropMarkers.current.forEach((m) => m.setMap(null));
+  //   pickupMarkers.current = [];
+  //   dropMarkers.current = [];
 
-    optimizedOrders.slice(0, 5).forEach((o) => {
-      const pickup = new window.google.maps.Marker({
-        position: { lat: o.pickupLat, lng: o.pickupLng },
-        map: map.current,
-        icon: { url: "/pickup-pin.png", scaledSize: new window.google.maps.Size(40, 40) },
-      });
+  //   optimizedOrders.slice(0, 5).forEach((o) => {
+  //     const pickup = new window.google.maps.Marker({
+  //       position: { lat: o.pickupLat, lng: o.pickupLng },
+  //       map: map.current,
+  //       icon: { url: "/pickup-pin.png", scaledSize: new window.google.maps.Size(40, 40) },
+  //     });
 
-      const drop = new window.google.maps.Marker({
-        position: { lat: o.dropLat, lng: o.dropLng },
-        map: map.current,
-        icon: { url: "/drop-pin.png", scaledSize: new window.google.maps.Size(40, 40) },
-      });
+  //     const drop = new window.google.maps.Marker({
+  //       position: { lat: o.dropLat, lng: o.dropLng },
+  //       map: map.current,
+  //       icon: { url: "/drop-pin.png", scaledSize: new window.google.maps.Size(40, 40) },
+  //     });
 
-      pickupMarkers.current.push(pickup);
-      dropMarkers.current.push(drop);
-    });
+  //     pickupMarkers.current.push(pickup);
+  //     dropMarkers.current.push(drop);
+  //   });
 
-    const path = optimizedOrders.slice(0, 5).flatMap((o) => [
-      { lat: o.pickupLat, lng: o.pickupLng },
-      { lat: o.dropLat, lng: o.dropLng },
-    ]);
+  //   const path = optimizedOrders.slice(0, 5).flatMap((o) => [
+  //     { lat: o.pickupLat, lng: o.pickupLng },
+  //     { lat: o.dropLat, lng: o.dropLng },
+  //   ]);
 
-    if (polyline.current) polyline.current.setMap(null);
+  //   if (polyline.current) polyline.current.setMap(null);
 
-    if (path.length) {
-      polyline.current = new window.google.maps.Polyline({
-        path,
-        strokeColor: "#ff6600",
-        strokeWeight: 5,
-        map: map.current,
-      });
-    }
-  }, [optimizedOrders]);
+  //   if (path.length) {
+  //     polyline.current = new window.google.maps.Polyline({
+  //       path,
+  //       strokeColor: "#ff6600",
+  //       strokeWeight: 5,
+  //       map: map.current,
+  //     });
+  //   }
+  // }, [optimizedOrders]);
 
   // -------------------------
   // --- UI RENDERING ---
@@ -482,16 +533,14 @@ export default function DashboardPage() {
         <div className="bg-white p-4 rounded-2xl shadow space-y-4">
           <h3 className="text-lg font-semibold">Recent Orders (5)</h3>
 
-          {optimizedOrders.slice(0, 5).length === 0 ? (
+          {orders.length === 0 ? (
             <p className="text-gray-400">No active orders</p>
           ) : (
-            optimizedOrders.slice(0, 5).map((order) => (
+           orders.slice(0, 5).map((order) => (
               <OrderCard
-                key={order.id}
-                order={order}
-                updateOrderStatus={updateOrderStatus}
-                openNavigation={() => openNavigation(optimizedOrders)}
-              />
+              key={order.id}
+              order={order}
+            />
             ))
           )}
         </div>
@@ -542,31 +591,36 @@ function FooterBtn({ label, icon, path }) {
   );
 }
 
-function OrderCard({ order, updateOrderStatus, openNavigation }) {
+function OrderCard({ order }) {
   return (
-    <div className="border rounded-xl p-3">
-      <div className="font-semibold">Order #{order.id}</div>
-      <div className="text-sm text-gray-600">
-        Customer: {order.customer} | {order.phone}
+    <div className="border rounded-xl p-4 shadow-sm bg-white">
+      <div className="flex justify-between items-center">
+        <div className="font-semibold text-gray-800">
+          {order.id}
+        </div>
+        <div className="text-sm font-semibold text-orange-500">
+          ₹{order.amount}
+        </div>
       </div>
-      <div className="text-sm text-gray-600">Pickup: {order.pickup}</div>
-      <div className="text-sm text-gray-600">Drop: {order.drop}</div>
-      <div className="text-sm text-gray-600">ETA: {order.eta}</div>
 
-      <div className="flex gap-2 mt-2">
-        <Btn text="Picked" color="bg-green-400" onClick={() => updateOrderStatus(order.id, "Picked up")} />
-        <Btn text="On Way" color="bg-blue-400" onClick={() => updateOrderStatus(order.id, "On the way")} />
-        <Btn text="Delivered" color="bg-gray-500" onClick={() => updateOrderStatus(order.id, "Delivered")} />
-        <Btn text="Nav" color="bg-orange-400" onClick={openNavigation} />
+      <div className="text-sm text-gray-600 mt-1">
+        Status: <span className="capitalize">{order.status}</span>
       </div>
+
+      {order.isLive && (
+        <div className="text-xs text-green-600 font-semibold mt-2">
+          ● Live Order
+        </div>
+      )}
     </div>
   );
 }
 
-function Btn({ text, color, onClick }) {
-  return (
-    <button className={`${color} text-white rounded px-3 py-1 text-sm`} onClick={onClick}>
-      {text}
-    </button>
-  );
-}
+
+// function Btn({ text, color, onClick }) {
+//   return (
+//     <button className={`${color} text-white rounded px-3 py-1 text-sm`} onClick={onClick}>
+//       {text}
+//     </button>
+//   );
+// }

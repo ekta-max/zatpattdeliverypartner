@@ -3,75 +3,111 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CheckCircle } from "lucide-react";
+import {
+  getSevaSlots,
+  selectSevaSlots,
+} from "../Services/sevaslots";
+
 
 /* ================= SEVA SHIFT DATA ================= */
 
-const SHIFTS = {
-  morning: [
-    {
-      id: "6-9",
-      label: "6 AM – 9 AM",
-      payout: [55, 80],
-      duration: 3,
-      break: 10,
-    },
-    {
-      id: "9-12",
-      label: "9 AM – 12 PM",
-      payout: [55, 80],
-      duration: 3,
-    },
-  ],
+// const SHIFTS = {
+//   morning: [
+//     {
+//       id: "6-9",
+//       label: "6 AM – 9 AM",
+//       payout: [55, 80],
+//       duration: 3,
+//       break: 10,
+//     },
+//     {
+//       id: "9-12",
+//       label: "9 AM – 12 PM",
+//       payout: [55, 80],
+//       duration: 3,
+//     },
+//   ],
 
-  afternoon: [
-    {
-      id: "12-15",
-      label: "12 PM – 3 PM",
-      payout: [60, 85],
-      duration: 3,
-      break: 20,
-      star: true,
-    },
-    {
-      id: "15-17",
-      label: "3 PM – 5 PM",
-      payout: [60, 85],
-      duration: 2,
-    },
-  ],
+//   afternoon: [
+//     {
+//       id: "12-15",
+//       label: "12 PM – 3 PM",
+//       payout: [60, 85],
+//       duration: 3,
+//       break: 20,
+//       star: true,
+//     },
+//     {
+//       id: "15-17",
+//       label: "3 PM – 5 PM",
+//       payout: [60, 85],
+//       duration: 2,
+//     },
+//   ],
 
-  evening: [
-    {
-      id: "17-20",
-      label: "5 PM – 8 PM",
-      payout: [70, 100],
-      duration: 3,
-      break: 10,
-      star: true,
-    },
-    {
-      id: "20-23",
-      label: "8 PM – 11 PM",
-      payout: [70, 100],
-      duration: 3,
-    },
-  ],
+//   evening: [
+//     {
+//       id: "17-20",
+//       label: "5 PM – 8 PM",
+//       payout: [70, 100],
+//       duration: 3,
+//       break: 10,
+//       star: true,
+//     },
+//     {
+//       id: "20-23",
+//       label: "8 PM – 11 PM",
+//       payout: [70, 100],
+//       duration: 3,
+//     },
+//   ],
 
-  night: [
-    {
-      id: "23-1",
-      label: "11 PM – 1 AM",
-      payout: [50, 80],
-      duration: 2, // ❌ NO BREAK HERE
-    },
-  ],
-};
+//   night: [
+//     {
+//       id: "23-1",
+//       label: "11 PM – 1 AM",
+//       payout: [50, 80],
+//       duration: 2, // ❌ NO BREAK HERE
+//     },
+//   ],
+// };
 
 /* ================= COMPONENT ================= */
 
 export default function SevaShiftSelectionPage() {
   const navigate = useNavigate();
+  const [slots, setSlots] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedSlots, setSelectedSlots] = useState([]);
+
+  useEffect(() => {
+  const fetchSlots = async () => {
+    try {
+      const res = await getSevaSlots();
+
+      console.log("Slots API ✅", res);
+
+      const data = res.data || [];
+
+      const formatted = data.map((slot) => ({
+        id: slot.slot_id, // ✅ IMPORTANT
+        label: slot.shift_name,
+        duration: slot.duration_hours,
+        earning: slot.estimated_earning,
+      }));
+
+      setSlots(formatted);
+
+    } catch (err) {
+      console.error("Slots API error ❌", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchSlots();
+}, []);
+
 
   /* 🔒 BLOCK RE-ENTRY */
   useEffect(() => {
@@ -82,39 +118,41 @@ export default function SevaShiftSelectionPage() {
   }, [navigate]);
 
   /* 💰 TOTAL PAYOUT (hourly × duration) */
-  const payout = useMemo(() => {
-    let min = 0;
-    let max = 0;
+  // const payout = useMemo(() => {
+  //   let min = 0;
+  //   let max = 0;
 
-    selectedSlots.forEach((s) => {
-      min += s.payout[0] * s.duration;
-      max += s.payout[1] * s.duration;
-    });
+  //   selectedSlots.forEach((s) => {
+  //     min += s.payout[0] * s.duration;
+  //     max += s.payout[1] * s.duration;
+  //   });
 
-    return { min, max };
-  }, [selectedSlots]);
+  //   return { min, max };
+  // }, [selectedSlots]);
 
-  const toggleSlot = (slot) => {
-    setSelectedSlots((prev) =>
-      prev.find((s) => s.id === slot.id)
-        ? prev.filter((s) => s.id !== slot.id)
-        : [...prev, slot]
-    );
-  };
+const toggleSlot = (slot) => {
+  setSelectedSlots((prev) =>
+    prev.find((s) => s.id === slot.id)
+      ? prev.filter((s) => s.id !== slot.id)
+      : [...prev, slot]
+  );
+};
 
-  const handleConfirm = () => {
-    localStorage.setItem(
-      "seva_shifts",
-      JSON.stringify({
-        date: new Date().toISOString().slice(0, 10),
-        slots: selectedSlots,
-        payout_min: payout.min,
-        payout_max: payout.max,
-      })
-    );
+const handleConfirm = async () => {
+  if (selectedSlots.length === 0) return;
+
+  try {
+    await selectSevaSlots(selectedSlots.map((s) => s.id));
+
+    console.log("Slots selected ✅");
 
     navigate("/dashboard", { replace: true });
-  };
+
+  } catch (err) {
+    console.error("Select slots error ❌", err);
+    alert("Failed to select slots");
+  }
+};
 
   return (
     <div className="min-h-screen bg-white px-4 py-6 pb-40">
@@ -123,8 +161,9 @@ export default function SevaShiftSelectionPage() {
         You can select multiple Seva Slots for today
       </p>
 
+
       {/* ===== SHIFT GROUPS ===== */}
-      {Object.entries(SHIFTS).map(([group, slots]) => (
+      {/* {Object.entries(SHIFTS).map(([group, slots]) => (
         <div key={group} className="mb-6">
           <h2 className="text-sm font-semibold capitalize mb-3">
             {group} shift
@@ -186,7 +225,65 @@ export default function SevaShiftSelectionPage() {
             })}
           </div>
         </div>
-      ))}
+      ))} */}
+
+{loading ? (
+  <p>Loading slots...</p>
+) : slots.length === 0 ? (
+  <p>No slots available</p>
+) : (
+  <div className="space-y-3">
+    {slots.map((slot) => {
+      const active = selectedSlots.find(
+        (s) => s.id === slot.id
+      );
+
+      return (
+<div
+  key={slot.id}
+  onClick={() => toggleSlot(slot)}
+  className={`p-4 rounded-xl border cursor-pointer transition ${
+    active
+      ? "border-orange-500 bg-orange-50"
+      : "border-gray-200"
+  }`}
+>
+  {/* TOP ROW */}
+  <div className="flex justify-between items-center">
+    <p className="text-sm font-semibold text-gray-900">
+      {slot.label}
+    </p>
+<span className="text-[10px] bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full ml-2">
+  Popular
+</span>
+    <div className="w-5 h-5 rounded border flex items-center justify-center">
+      {active && (
+        <CheckCircle size={18} className="text-orange-500" />
+      )}
+    </div>
+  </div>
+
+  {/* MIDDLE ROW */}
+  <p className="text-xs text-gray-500 mt-1">
+    ⏱ {slot.duration} hrs
+  </p>
+
+  {/* BOTTOM ROW (PRICE - CLEAN) */}
+  <div className="mt-2 flex justify-between items-center">
+    <p className="text-xs text-gray-500">
+      Estimated earning
+    </p>
+
+    <p className="text-sm font-bold text-green-600">
+      ₹{slot.earning.min} – ₹{slot.earning.max}
+    </p>
+  </div>
+</div>
+      );
+    })}
+  </div>
+)}
+
 
       {/* ===== SUMMARY BAR ===== */}
       {selectedSlots.length > 0 && (
@@ -200,9 +297,9 @@ export default function SevaShiftSelectionPage() {
             </p>
           </div>
 
-          <p className="text-sm font-semibold mb-3">
+          {/* <p className="text-sm font-semibold mb-3">
             Estimated payout: ₹{payout.min} – ₹{payout.max}
-          </p>
+          </p> */}
 
           <button
             onClick={handleConfirm}

@@ -1,3 +1,5 @@
+//src\Services\partnerkit.js
+
 import api from "./api";
 
 /**

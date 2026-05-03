@@ -1,18 +1,18 @@
-//src\services\authApi.js
+// src/Services/auth.js
 
 import api from "./api";
 
 /**
- * Request OTP for login
+ * Request OTP
  * POST /api/v1/users/admin/request-otp/
  */
-export const requestOtp = async (payload) => {
+export const requestOtp = async (mobile) => {
   const res = await api.post(
     "/api/v1/users/admin/request-otp/",
     {
-      ...payload,
-      role: "merchant", // ✅ explicitly set role
+      mobile,
     }
   );
+
   return res.data;
 };

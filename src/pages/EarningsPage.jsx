@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import { getEarnings, requestPayment } from "../Services/earnings";
+
 
 export default function EarningsPage() {
   const navigate = useNavigate();
@@ -22,31 +24,60 @@ export default function EarningsPage() {
   // LOAD DATA FROM STORAGE
   // ------------------------------------------------------
   useEffect(() => {
-    const saved = JSON.parse(localStorage.getItem("partner_earnings") || "{}");
-    const wallet = JSON.parse(localStorage.getItem("partner_wallet") || "{}");
-    const withdraw = localStorage.getItem("withdraw_request") || "none";
+  const fetchEarnings = async () => {
+    try {
+      const data = await getEarnings();
 
-    setEarnings({
-      daily: saved.daily || 0,
-      weekly: saved.weekly || 0,
-      monthly: saved.monthly || 0,
-      total: saved.total || 0,
-      bonuses: saved.bonuses || 0,
-    });
+      console.log("Earnings API ✅", data);
 
-    setPending(wallet.pending || 0);
-    setWithdrawStatus(withdraw);
-  }, []);
+      // 🔥 SAFE MAPPING (handles all formats)
+      const e = data.data || data;
+
+      setEarnings({
+  daily: e.today?.earnings || 0,
+  weekly: e.week?.earnings || 0,
+  monthly: e.month?.earnings || 0,
+  total: e.total?.earnings || 0,
+  bonuses: 0, // ❗ backend not sending bonuses yet
+});
+
+setPending(e.pending_payment || 0);
+      
+    } catch (err) {
+      console.error("Earnings API error ❌", err);
+    }
+  };
+
+  fetchEarnings();
+
+  // still keep withdraw status from localStorage
+  const withdraw = localStorage.getItem("withdraw_request") || "none";
+  setWithdrawStatus(withdraw);
+
+}, []);
 
   // ------------------------------------------------------
   // HANDLE WITHDRAW REQUEST
   // ------------------------------------------------------
-  const handleWithdrawRequest = () => {
-    if (pending === 0) return;
+  const handleWithdrawRequest = async () => {
+  if (pending === 0) return;
 
-    localStorage.setItem("withdraw_request", "pending");
+  try {
+    await requestPayment();
+
+    console.log("Payment request sent ✅");
+
+    // ✅ Update UI
     setWithdrawStatus("pending");
-  };
+
+    // optional local fallback
+    localStorage.setItem("withdraw_request", "pending");
+
+  } catch (err) {
+    console.error("Payment request API error ❌", err);
+    alert("Failed to request payment");
+  }
+};
 
   return (
     <div className="min-h-screen bg-orange-50 flex flex-col">
