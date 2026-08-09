@@ -1,4 +1,4 @@
-// src/pages/loginpage.jsx
+// src/pages/LoginPage.jsx
 
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";

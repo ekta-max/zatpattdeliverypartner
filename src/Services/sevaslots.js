@@ -6,10 +6,7 @@ import api from "./api";
  */
 export const getSevaSlots = async () => {
   const res = await api.post(
-    "/api/v1/common/delivery-partner/list-slots/",
-    {
-      user: 10,
-    }
+    "/api/v1/common/delivery-partner/list-slots/"
   );
 
   return res.data;
@@ -23,7 +20,6 @@ export const selectSevaSlots = async (slots) => {
   const res = await api.post(
     "/api/v1/common/delivery-partner/select-slots/",
     {
-      user: 10,
       slots, // [1,2]
     }
   );

@@ -8,10 +8,7 @@ import api from "./api";
  */
 export const getLeaderboard = async () => {
   const res = await api.post(
-    "/api/v1/common/delivery-partner/leaderboard-dp/",
-    {
-      user: 10, // ⚠️ make dynamic later
-    }
+    "/api/v1/common/delivery-partner/leaderboard-dp/"
   );
 
   return res.data;

@@ -12,8 +12,7 @@ export default function EarningsPage() {
     daily: 0,
     weekly: 0,
     monthly: 0,
-    total: 0,
-    bonuses: 0,
+    total: 0
   });
 
   const [pending, setPending] = useState(0);
@@ -37,8 +36,7 @@ export default function EarningsPage() {
   daily: e.today?.earnings || 0,
   weekly: e.week?.earnings || 0,
   monthly: e.month?.earnings || 0,
-  total: e.total?.earnings || 0,
-  bonuses: 0, // ❗ backend not sending bonuses yet
+  total: e.total?.earnings || 0
 });
 
 setPending(e.pending_payment || 0);
@@ -105,7 +103,6 @@ setPending(e.pending_payment || 0);
         {/* TOTAL & BONUSES */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <EarningBox label="Total Earnings" value={earnings.total} />
-          <EarningBox label="Bonuses & Incentives" value={earnings.bonuses} />
         </div>
 
         {/* WALLET (PENDING ONLY) */}

@@ -61,12 +61,24 @@ export default function WorkDetailsPage() {
     if (!city || !vehicle) return;
 
     try {
-     await submitWorkDetails({
-      city: city.id || city, // 👈 send ID if exists
-      vehicle_type: vehicle,
-    });
+      await submitWorkDetails({
+        city: city.id || city,
+        vehicle_type: vehicle,
+      });
 
       console.log("Work details saved ✅");
+
+      // ✅ Mark work_details as completed so PersonalDetailsPage doesn't bounce you back
+      const existing =
+        JSON.parse(localStorage.getItem("onboarding_progress")) || {};
+
+      localStorage.setItem(
+        "onboarding_progress",
+        JSON.stringify({
+          ...existing,
+          work_details: "completed",
+        })
+      );
 
       navigate("/onboarding-steps");
     } catch (err) {

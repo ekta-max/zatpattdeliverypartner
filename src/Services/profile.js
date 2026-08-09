@@ -2,16 +2,10 @@
 
 import api from "./api";
 
-/**
- * Get Delivery Partner Profile
- * POST /api/v1/common/delivery-partner/my-profile-dp/
- */
+
 export const getProfile = async () => {
-  const res = await api.post(
+  const res = await api.get(
     "/api/v1/common/delivery-partner/my-profile-dp/",
-    {
-      user: 10, // ⚠️ make dynamic later
-    }
   );
 
   return res.data;
@@ -53,7 +47,6 @@ export const reportBug = async ({ report }) => {
   const res = await api.post(
     "/api/v1/common/delivery-partner/report-bug/",
     {
-      user: 10,
       report,
     }
   );

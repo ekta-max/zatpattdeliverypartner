@@ -1,78 +1,12 @@
 //src\pages\SevaShiftSelectionPage.jsx
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CheckCircle } from "lucide-react";
 import {
   getSevaSlots,
   selectSevaSlots,
 } from "../Services/sevaslots";
-
-
-/* ================= SEVA SHIFT DATA ================= */
-
-// const SHIFTS = {
-//   morning: [
-//     {
-//       id: "6-9",
-//       label: "6 AM – 9 AM",
-//       payout: [55, 80],
-//       duration: 3,
-//       break: 10,
-//     },
-//     {
-//       id: "9-12",
-//       label: "9 AM – 12 PM",
-//       payout: [55, 80],
-//       duration: 3,
-//     },
-//   ],
-
-//   afternoon: [
-//     {
-//       id: "12-15",
-//       label: "12 PM – 3 PM",
-//       payout: [60, 85],
-//       duration: 3,
-//       break: 20,
-//       star: true,
-//     },
-//     {
-//       id: "15-17",
-//       label: "3 PM – 5 PM",
-//       payout: [60, 85],
-//       duration: 2,
-//     },
-//   ],
-
-//   evening: [
-//     {
-//       id: "17-20",
-//       label: "5 PM – 8 PM",
-//       payout: [70, 100],
-//       duration: 3,
-//       break: 10,
-//       star: true,
-//     },
-//     {
-//       id: "20-23",
-//       label: "8 PM – 11 PM",
-//       payout: [70, 100],
-//       duration: 3,
-//     },
-//   ],
-
-//   night: [
-//     {
-//       id: "23-1",
-//       label: "11 PM – 1 AM",
-//       payout: [50, 80],
-//       duration: 2, // ❌ NO BREAK HERE
-//     },
-//   ],
-// };
-
-/* ================= COMPONENT ================= */
 
 export default function SevaShiftSelectionPage() {
   const navigate = useNavigate();
@@ -81,33 +15,39 @@ export default function SevaShiftSelectionPage() {
   const [selectedSlots, setSelectedSlots] = useState([]);
 
   useEffect(() => {
-  const fetchSlots = async () => {
-    try {
-      const res = await getSevaSlots();
+    const fetchSlots = async () => {
+      try {
+        const res = await getSevaSlots();
 
-      console.log("Slots API ✅", res);
+        console.log("Slots API ✅", res);
 
-      const data = res.data || [];
+        const data = res.data || [];
 
-      const formatted = data.map((slot) => ({
-        id: slot.slot_id, // ✅ IMPORTANT
-        label: slot.shift_name,
-        duration: slot.duration_hours,
-        earning: slot.estimated_earning,
-      }));
+        const formatted = data.map((slot) => ({
+          id: slot.slot_id,
+          label: slot.shift_name,
+          duration: slot.duration_hours,
+          earning: slot.estimated_earning,
+          // ✅ true = enabled/selectable, false = disabled/full
+          capacity: slot.capacity,
+          preselected: !!slot.preselected,
+        }));
 
-      setSlots(formatted);
+        const preselectedSlots = formatted.filter((s) => s.preselected);
+          if (preselectedSlots.length > 0) {
+            setSelectedSlots(preselectedSlots);
+          }
 
-    } catch (err) {
-      console.error("Slots API error ❌", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+        setSlots(formatted);
+      } catch (err) {
+        console.error("Slots API error ❌", err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  fetchSlots();
-}, []);
-
+    fetchSlots();
+  }, []);
 
   /* 🔒 BLOCK RE-ENTRY */
   useEffect(() => {
@@ -117,42 +57,30 @@ export default function SevaShiftSelectionPage() {
     }
   }, [navigate]);
 
-  /* 💰 TOTAL PAYOUT (hourly × duration) */
-  // const payout = useMemo(() => {
-  //   let min = 0;
-  //   let max = 0;
+  const toggleSlot = (slot) => {
+    if (!slot.capacity) return; // 🚫 disabled slots can't be selected
 
-  //   selectedSlots.forEach((s) => {
-  //     min += s.payout[0] * s.duration;
-  //     max += s.payout[1] * s.duration;
-  //   });
+    setSelectedSlots((prev) =>
+      prev.find((s) => s.id === slot.id)
+        ? prev.filter((s) => s.id !== slot.id)
+        : [...prev, slot]
+    );
+  };
 
-  //   return { min, max };
-  // }, [selectedSlots]);
+  const handleConfirm = async () => {
+    if (selectedSlots.length === 0) return;
 
-const toggleSlot = (slot) => {
-  setSelectedSlots((prev) =>
-    prev.find((s) => s.id === slot.id)
-      ? prev.filter((s) => s.id !== slot.id)
-      : [...prev, slot]
-  );
-};
+    try {
+      await selectSevaSlots(selectedSlots.map((s) => s.id));
 
-const handleConfirm = async () => {
-  if (selectedSlots.length === 0) return;
+      console.log("Slots selected ✅");
 
-  try {
-    await selectSevaSlots(selectedSlots.map((s) => s.id));
-
-    console.log("Slots selected ✅");
-
-    navigate("/dashboard", { replace: true });
-
-  } catch (err) {
-    console.error("Select slots error ❌", err);
-    alert("Failed to select slots");
-  }
-};
+      navigate("/dashboard", { replace: true });
+    } catch (err) {
+      console.error("Select slots error ❌", err);
+      alert("Failed to select slots");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white px-4 py-6 pb-40">
@@ -161,129 +89,83 @@ const handleConfirm = async () => {
         You can select multiple Seva Slots for today
       </p>
 
+      {loading ? (
+        <p>Loading slots...</p>
+      ) : slots.length === 0 ? (
+        <p>No slots available</p>
+      ) : (
+        <div className="space-y-3">
+          {slots.map((slot) => {
+            const active = selectedSlots.find((s) => s.id === slot.id);
+            const isDisabled = !slot.capacity;
 
-      {/* ===== SHIFT GROUPS ===== */}
-      {/* {Object.entries(SHIFTS).map(([group, slots]) => (
-        <div key={group} className="mb-6">
-          <h2 className="text-sm font-semibold capitalize mb-3">
-            {group} shift
-          </h2>
+            return (
+              <div
+                key={slot.id}
+                onClick={() => toggleSlot(slot)}
+                className={`p-4 rounded-xl border transition ${
+                  isDisabled
+                    ? "border-gray-200 bg-gray-100 opacity-60 cursor-not-allowed"
+                    : active
+                    ? "border-orange-500 bg-orange-50 cursor-pointer"
+                    : "border-gray-200 cursor-pointer"
+                }`}
+              >
+                {/* TOP ROW */}
+                <div className="flex justify-between items-center">
+                  <p
+                    className={`text-sm font-semibold ${
+                      isDisabled ? "text-gray-400" : "text-gray-900"
+                    }`}
+                  >
+                    {slot.label}
+                  </p>
 
-          <div className="space-y-3">
-            {slots.map((slot) => {
-              const active = selectedSlots.find(
-                (s) => s.id === slot.id
-              );
+                  {isDisabled ? (
+                    <span className="text-[10px] bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full ml-2">
+                      Full
+                    </span>
+                  ) : (
+                    <span className="text-[10px] bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full ml-2">
+                      Popular
+                    </span>
+                  )}
 
-              return (
-                <div
-                  key={slot.id}
-                  onClick={() => toggleSlot(slot)}
-                  className={`p-4 rounded-xl border cursor-pointer transition ${
-                    active
-                      ? "border-orange-500 bg-orange-50"
-                      : "border-gray-200"
-                  }`}
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="text-sm font-medium flex items-center gap-2">
-                        {slot.label}
-                        {slot.star && (
-                          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
-                            ⭐ Seva Slot
-                          </span>
-                        )}
-                      </p>
-
-                      <p className="text-xs text-gray-500 mt-1">
-                        ₹{slot.payout[0]} – ₹{slot.payout[1]} per hour
-                      </p>
-
-                      <p className="text-xs text-gray-500">
-                        ⏱ {slot.duration} hrs
-                        {slot.break && ` · ☕ ${slot.break} min break`}
-                      </p>
-
-                      <p className="text-xs font-semibold text-green-700 mt-1">
-                        Estimated: ₹{slot.payout[0] * slot.duration} – ₹
-                        {slot.payout[1] * slot.duration}
-                      </p>
-                    </div>
-
+                  {!isDisabled && (
                     <div className="w-5 h-5 rounded border flex items-center justify-center">
-                      {active && (
-                        <CheckCircle
-                          size={18}
-                          className="text-orange-500"
-                        />
+                      {(active || slot.preselected) && (
+                        <CheckCircle size={18} className="text-orange-500" />
                       )}
                     </div>
-                  </div>
+                  )}
                 </div>
-              );
-            })}
-          </div>
+
+                {/* MIDDLE ROW */}
+                <p
+                  className={`text-xs mt-1 ${
+                    isDisabled ? "text-gray-400" : "text-gray-500"
+                  }`}
+                >
+                  ⏱ {slot.duration} hrs
+                </p>
+
+                {/* BOTTOM ROW (PRICE) */}
+                <div className="mt-2 flex justify-between items-center">
+                  <p className={`text-xs ${isDisabled ? "text-gray-400" : "text-gray-500"}`}>
+                    {isDisabled ? "Slot full" : "Estimated earning"}
+                  </p>
+
+                  {!isDisabled && (
+                    <p className="text-sm font-bold text-green-600">
+                      ₹{slot.earning.min} – ₹{slot.earning.max}
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
-      ))} */}
-
-{loading ? (
-  <p>Loading slots...</p>
-) : slots.length === 0 ? (
-  <p>No slots available</p>
-) : (
-  <div className="space-y-3">
-    {slots.map((slot) => {
-      const active = selectedSlots.find(
-        (s) => s.id === slot.id
-      );
-
-      return (
-<div
-  key={slot.id}
-  onClick={() => toggleSlot(slot)}
-  className={`p-4 rounded-xl border cursor-pointer transition ${
-    active
-      ? "border-orange-500 bg-orange-50"
-      : "border-gray-200"
-  }`}
->
-  {/* TOP ROW */}
-  <div className="flex justify-between items-center">
-    <p className="text-sm font-semibold text-gray-900">
-      {slot.label}
-    </p>
-<span className="text-[10px] bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full ml-2">
-  Popular
-</span>
-    <div className="w-5 h-5 rounded border flex items-center justify-center">
-      {active && (
-        <CheckCircle size={18} className="text-orange-500" />
       )}
-    </div>
-  </div>
-
-  {/* MIDDLE ROW */}
-  <p className="text-xs text-gray-500 mt-1">
-    ⏱ {slot.duration} hrs
-  </p>
-
-  {/* BOTTOM ROW (PRICE - CLEAN) */}
-  <div className="mt-2 flex justify-between items-center">
-    <p className="text-xs text-gray-500">
-      Estimated earning
-    </p>
-
-    <p className="text-sm font-bold text-green-600">
-      ₹{slot.earning.min} – ₹{slot.earning.max}
-    </p>
-  </div>
-</div>
-      );
-    })}
-  </div>
-)}
-
 
       {/* ===== SUMMARY BAR ===== */}
       {selectedSlots.length > 0 && (
@@ -296,10 +178,6 @@ const handleConfirm = async () => {
               {selectedSlots.map((s) => s.label).join(", ")}
             </p>
           </div>
-
-          {/* <p className="text-sm font-semibold mb-3">
-            Estimated payout: ₹{payout.min} – ₹{payout.max}
-          </p> */}
 
           <button
             onClick={handleConfirm}

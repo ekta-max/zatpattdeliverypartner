@@ -3,6 +3,7 @@
 import React, { useState, useContext, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { Wallet, Clock, TrendingUp } from "lucide-react";
 import { LanguageContext } from "../context/LanguageContext";
 
 /* slides */
@@ -28,15 +29,18 @@ const SLIDES = [
   },
 ];
 
+const HIGHLIGHTS = [
+  { icon: Wallet, label: "Weekly Payouts" },
+  { icon: Clock, label: "Flexible Hours" },
+  { icon: TrendingUp, label: "Earn ₹60k+/mo" },
+];
+
 export default function InfoPage() {
   const navigate = useNavigate();
   const { lang } = useContext(LanguageContext);
 
   const [index, setIndex] = useState(0);
-  const [mobile, setMobile] = useState("");
-  const [error, setError] = useState("");
 
-  /* slideshow */
   useEffect(() => {
     const t = setInterval(
       () => setIndex((i) => (i + 1) % SLIDES.length),
@@ -45,47 +49,27 @@ export default function InfoPage() {
     return () => clearInterval(t);
   }, []);
 
-  /* validation */
-  useEffect(() => {
-    if (!mobile) setError("");
-    else if (!/^[6-9]\d{9}$/.test(mobile))
-      setError("Enter a valid 10 digit mobile number");
-    else setError("");
-  }, [mobile]);
-
-  const isValid = /^[6-9]\d{9}$/.test(mobile);
-
-  const handleLogin = () => {
-    if (!isValid) return;
-
-    // 🔥 MOCK OTP FLOW
-    localStorage.setItem("mock_otp", "123456");
-    localStorage.setItem("mock_phone", mobile);
-
-    navigate("/otp", { state: { phone: mobile } });
-  };
-
   const slide = SLIDES[index];
 
   return (
-    <div className="min-h-screen bg-white flex flex-col overflow-hidden">
+    <div className="h-screen overflow-hidden bg-white flex flex-col">
       {/* HERO */}
-      <div className="relative w-full h-[74vh] min-h-[500px] max-h-[650px]">
+      <div className="relative flex-1 min-h-0 w-full">
         <img
           src={slide.image}
-          className="absolute inset-0 w-full h-full object-cover"
+          className="absolute inset-0 w-full h-full object-cover object-center"
           alt=""
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/35 to-black/70" />
 
-        <div className="absolute top-12 left-5 right-5 text-white">
-          <h1 className="text-[22px] font-bold">{slide.title}</h1>
-          <p className="text-[13px] whitespace-pre-line opacity-90">
+        <div className="absolute top-8 left-5 right-5 text-white">
+          <h1 className="text-[20px] font-bold leading-tight">{slide.title}</h1>
+          <p className="text-[12px] whitespace-pre-line opacity-90 mt-1">
             {slide.subtitle}
           </p>
         </div>
 
-        <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-1">
+        <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1">
           {SLIDES.map((_, i) => (
             <span
               key={i}
@@ -97,74 +81,40 @@ export default function InfoPage() {
         </div>
       </div>
 
-      {/* LOGIN */}
-      <div className="-mt-4 bg-white rounded-t-3xl px-5 pt-8 pb-6 shadow-[0_-10px_30px_rgba(0,0,0,0.15)]">
-        <h2 className="text-[18px] font-semibold text-orange-500 text-center">
-  🚀 <span className="font-bold">Deliver orders easily </span> with your{" "}<br></br>
-  <span className="font-bold">ZATPATT</span>
-</h2>
+      {/* BOTTOM CARD — highlights + single CTA, no fake login form */}
+      <div className="shrink-0 -mt-4 bg-white rounded-t-3xl px-5 pt-6 pb-6 shadow-[0_-10px_30px_rgba(0,0,0,0.15)]">
+        <h2 className="text-[16px] font-semibold text-orange-500 text-center leading-snug">
+          🚀 <span className="font-bold">Deliver orders easily</span> with
+          your <br />
+          <span className="font-bold">ZATPATT</span>
+        </h2>
 
-        {/* MOBILE INPUT WITH +91 + DIVIDER */}
-        <div className="mt-5">
-          <div
-            className={`
-              flex items-center
-              w-full
-              border
-              rounded-xl
-              px-3
-              transition
-              ${
-                mobile
-                  ? "border-orange-400"
-                  : "border-gray-300"
-              }
-              focus-within:ring-2 focus-within:ring-orange-500
-            `}
-          >
-            {/* +91 */}
-            <span className="text-orange-500 font-semibold text-sm select-none">
-              +91
-            </span>
-
-            {/* Divider */}
-            <div className="mx-3 h-6 w-px bg-gray-300" />
-
-            {/* Input */}
-            <input
-  type="tel"
-  inputMode="numeric"
-  pattern="[0-9]*"
-  placeholder="Enter 10 digit mobile number"
-  value={mobile}
-  onFocus={() => navigate("/login")}   // 🔥 ADD THIS
-  onChange={(e) => {
-    const onlyNumbers = e.target.value.replace(/\D/g, "");
-    setMobile(onlyNumbers);
-  }}
-  maxLength={10}
-  className="
-    flex-1
-    py-3
-    text-[14px]
-    outline-none
-    bg-transparent
-    text-gray-700
-  "
-/>   
-        </div>
-         
+        {/* Quick highlights row */}
+        <div className="mt-5 grid grid-cols-3 gap-2">
+          {HIGHLIGHTS.map(({ icon: Icon, label }) => (
+            <div
+              key={label}
+              className="flex flex-col items-center text-center gap-1.5 py-3 rounded-xl bg-orange-50"
+            >
+              <Icon size={20} className="text-orange-500" />
+              <span className="text-[11px] font-medium text-gray-700 leading-tight">
+                {label}
+              </span>
+            </div>
+          ))}
         </div>
 
-        {/* Continue BUTTON */}
         <button
           onClick={() => navigate("/login")}
-          className="mt-3 w-full max-w-md bg-orange-500 active:bg-orange-600 text-white py-3 rounded-xl font-semibold"
+          className="mt-5 w-full bg-orange-500 active:bg-orange-600 text-white py-3 rounded-xl font-semibold"
         >
-          Let's Start
+          Get Started
         </button>
-      
+
+        <p className="mt-3 text-[11px] text-gray-400 text-center">
+          By continuing you agree to our Terms & Privacy Policy
+        </p>
       </div>
-     </div>
+    </div>
   );
 }

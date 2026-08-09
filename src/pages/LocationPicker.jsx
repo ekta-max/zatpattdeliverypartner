@@ -1,85 +1,129 @@
-//src\pages\LocationPicker.jsx
+// src/pages/LocationPicker.jsx
 
-import React, { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
-import { updateDeliveryPartnerLocation } from "../Services/deliveryPartner";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+import { saveLocation } from "../Services/locationStorage";
 
-function LocationMarker({ setPosition }) {
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl:
+    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
+
+function LocationMarker({ position, setPosition }) {
   useMapEvents({
     click(e) {
       setPosition(e.latlng);
     },
   });
 
-  return null;
+  return position === null ? null : <Marker position={position} />;
 }
 
 export default function LocationPicker() {
+  const navigate = useNavigate();
   const [position, setPosition] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const mapRef = useRef(null);
 
-  // ✅ Auto detect current location
-  
   useEffect(() => {
-  if (!position) return;
+    const timer = setTimeout(() => {
+      if (mapRef.current) {
+        mapRef.current.invalidateSize();
+      }
+    }, 200);
+    return () => clearTimeout(timer);
+  }, []);
 
-  const sendLocation = async () => {
+  useEffect(() => {
+    const handleResize = () => {
+      if (mapRef.current) {
+        mapRef.current.invalidateSize();
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const handleConfirm = async () => {
+    if (!position || loading) {
+      if (!position) alert("Please select a location on the map first.");
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      await updateDeliveryPartnerLocation({
-        user: 37, // ✅ fixed
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${position.lat}&lon=${position.lng}&format=json`
+      );
+      const data = await res.json();
+
+      const city =
+        data.address?.city ||
+        data.address?.town ||
+        data.address?.village ||
+        "";
+      const state = data.address?.state || "";
+
+      saveLocation({
+        city,
+        state,
         latitude: position.lat,
         longitude: position.lng,
       });
-
-      console.log("Location sent ✅");
     } catch (err) {
-      console.error("API error ❌", err);
+      console.error("Reverse geocoding failed:", err);
+      saveLocation({
+        latitude: position.lat,
+        longitude: position.lng,
+      });
+    } finally {
+      setLoading(false);
+      navigate("/info"); // 👈 goes to InfoPage (slideshow + "Let's Start")
     }
   };
 
-  sendLocation();
-}, [position]);
-
-  const handleSubmit = async () => {
-  if (!position) {
-    alert("Please select location");
-    return;
-  }
-
-  try {
-    await updateDeliveryPartnerLocation({
-      user: 37, // ✅ fixed
-      latitude: position.lat,
-      longitude: position.lng,
-    });
-
-    alert("Location Updated ✅");
-  } catch (error) {
-    console.error(error);
-    alert("API Failed ❌");
-  }
-};
-
   return (
-    <div className="h-screen relative">
-  <MapContainer
-    center={[19.076, 72.8777]}
-    zoom={13}
-    className="h-full w-full"
-  >
-    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-    <LocationMarker setPosition={setPosition} />
-    {position && <Marker position={position} />}
-  </MapContainer>
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+      <div style={{ flex: 1, width: "100%", minHeight: "400px" }}>
+        <MapContainer
+          center={[19.076, 72.8777]}
+          zoom={12}
+          style={{ height: "100%", width: "100%" }}
+          whenCreated={(map) => {
+            mapRef.current = map;
+            setTimeout(() => map.invalidateSize(), 200);
+          }}
+        >
+          <TileLayer
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          />
+          <LocationMarker position={position} setPosition={setPosition} />
+        </MapContainer>
+      </div>
 
-  {/* Floating button */}
-  <div className="absolute bottom-0 left-0 right-0 p-4 bg-white">
-    <button
-      onClick={handleSubmit}
-      className="w-full bg-orange-500 text-white py-3 rounded-xl shadow-lg"
-    >
-      Confirm Location
-    </button>
-  </div>
-</div>
+      <button
+        onClick={handleConfirm}
+        disabled={loading}
+        style={{
+          backgroundColor: loading ? "#fdba74" : "#f97316",
+          color: "white",
+          fontWeight: "bold",
+          fontSize: "18px",
+          padding: "16px",
+          border: "none",
+          cursor: loading ? "not-allowed" : "pointer",
+        }}
+      >
+        {loading ? "Saving..." : "Confirm Location"}
+      </button>
+    </div>
   );
 }

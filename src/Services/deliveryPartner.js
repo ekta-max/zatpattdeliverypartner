@@ -24,22 +24,33 @@ export const updateDeliveryPartnerLocation = async ({
   return res.data;
 };
 
-
 /**
- * Update Delivery Partner Permissions
+ * Delivery Partner Permissions (stored locally, no API call)
  */
 
-export const updateDeliveryPartnerPermissions = async () => {
-  const res = await api.post(
-    "/api/v1/common/delivery-partner/update-permission/",
-    {
-      user: 37,
-      location_permission: true,
-      background_location_permission: true,
-      camera_permission: true,
-      notification_permission: true,
-    }
-  );
+const PERMISSIONS_KEY = "delivery_partner_permissions";
 
-  return res.data;
+const defaultPermissions = {
+  location_permission: false,
+  background_location_permission: false,
+  camera_permission: false,
+  notification_permission: false,
+};
+
+export const getDeliveryPartnerPermissions = () => {
+  const stored = localStorage.getItem(PERMISSIONS_KEY);
+  return stored ? JSON.parse(stored) : { ...defaultPermissions };
+};
+
+export const updateDeliveryPartnerPermissions = (permissions = {}) => {
+  const current = getDeliveryPartnerPermissions();
+  const updated = { ...current, ...permissions };
+
+  localStorage.setItem(PERMISSIONS_KEY, JSON.stringify(updated));
+
+  return updated;
+};
+
+export const clearDeliveryPartnerPermissions = () => {
+  localStorage.removeItem(PERMISSIONS_KEY);
 };

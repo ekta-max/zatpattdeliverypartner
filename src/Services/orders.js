@@ -86,3 +86,18 @@ export const markDeliveredApi = async (orderId) => {
 
   return res.data;
 };
+
+/**
+ * COLLECT PAYMENT (COD)
+ * POST /collect-payment/
+ */
+export const collectPaymentApi = async (orderId) => {
+  const res = await api.post(
+    "/api/v1/common/delivery-partner/collect-payment/",
+    {
+      order_id: orderId,
+    }
+  );
+
+  return res.data;
+};

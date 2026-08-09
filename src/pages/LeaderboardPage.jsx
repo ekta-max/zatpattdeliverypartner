@@ -254,23 +254,8 @@ useEffect(() => {
       
       {/* 🔥 FIXED USER RANK BAR */}
 
- {currentUser && (
-  <div className="fixed bottom-0 left-0 right-0 bg-orange-500 text-white px-4 py-3 flex justify-between items-center shadow-lg">
-    
-    <span className="font-bold">
-      #{userOrdersRank}
-    </span>
-
-    <span className="font-semibold truncate">
-      {currentUser.name}
-    </span>
-
-    <span className="font-bold">
-      {currentUser.completed}
-    </span>
-
-  </div>
-)}
+      {/* 🔥 FIXED USER RANK BAR */}
+      
 
     </div>
   );

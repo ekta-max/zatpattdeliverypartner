@@ -1,16 +1,14 @@
 //src\pages\PartnerKitOrderPage.jsx
 
-import React, { useState } from "react";
-import { ArrowLeft, HelpCircle } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { ArrowLeft, HelpCircle, Shirt, Backpack, IdCard } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useEffect } from "react";
 
 import KitImage from "../assets/partner-kit.png";
 import TshirtModel from "../assets/tshirt-model.png";
-import DeliveryConfirm from "../assets/delivery-confirm.png";
 import { DEV_MODE } from "../config/appConfig";
 import { submitPartnerKit } from "../Services/partnerkit";
-
+import { getMyProfileDp } from "../Services/profileDp";
 
 const SIZES = ["S", "M", "L", "XL", "2XL"];
 
@@ -19,50 +17,83 @@ export default function PartnerKitOrderPage() {
   const [step, setStep] = useState(1);
 
   const [size, setSize] = useState("");
-  // const [paymentMode, setPaymentMode] = useState("now");
-
-  // const [address, setAddress] = useState({
-  // house: "",
-  // locality: "",
-  // landmark: "",
-  // pincode: "",
-  // city: "",
-  // state: "",
-  // });
+  const [submitting, setSubmitting] = useState(false);
 
   const progressPercent = (step / 3) * 100;
 
   useEffect(() => {
-  const progress = JSON.parse(
-    localStorage.getItem("onboarding_progress")
-  );
+    const progress = JSON.parse(
+      localStorage.getItem("onboarding_progress")
+    );
 
-  // ❌ Block access if personal details not done
-  // if (progress?.personal_details !== "completed") {
-  //   navigate("/personal-details", { replace: true });
-  // }
+    if (!DEV_MODE && progress?.personal_details !== "completed") {
+      navigate("/personal-details");
+    }
 
+    if (progress?.kit_ordered === true) {
+      navigate("/verification-pending", { replace: true });
+    }
+  }, [navigate]);
 
-  if (!DEV_MODE && progress?.personal_details !== "completed") {
-  navigate("/personal-details");
-}
+  const handleSubmitKit = async () => {
+    if (!size || submitting) return;
 
+    setSubmitting(true);
 
-  // ❌ Block access if kit already ordered
-  if (progress?.kit_ordered === true) {
-    navigate("/verification-pending", { replace: true });
-  }
-}, [navigate]);
+    try {
+      // ✅ STEP 1: submit the kit selection
+      await submitPartnerKit({
+        tshirt_size: size,
+      });
 
+      console.log("Partner kit submitted ✅");
+
+      localStorage.setItem(
+        "partner_kit",
+        JSON.stringify({
+          tshirt_size: size,
+          delivery_type: "pickup",
+        })
+      );
+
+      const existing =
+        JSON.parse(localStorage.getItem("onboarding_progress")) || {};
+
+      localStorage.setItem(
+        "onboarding_progress",
+        JSON.stringify({
+          ...existing,
+          kit_ordered: true,
+        })
+      );
+
+      // ✅ STEP 2: immediately check verification status
+      const profileRes = await getMyProfileDp();
+      const isVerified = profileRes?.data?.is_verified;
+
+      console.log("Profile check ✅", profileRes);
+
+      // ✅ STEP 3: route based on is_verified
+      if (isVerified) {
+        navigate("/training-intro", { replace: true }); // 👈 changed from /seva-slots
+      } else {
+        navigate("/verification-pending", { replace: true });
+      }
+    } catch (err) {
+      console.error("Partner kit / profile check API error ❌", err);
+      alert("Failed to submit partner kit");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
       {/* ===== HEADER ===== */}
       <div className="flex items-center px-4 py-3 border-b">
-       <button
+        <button
           onClick={() => {
             if (step > 1) setStep(step - 1);
-            if (step === 1) return;
           }}
         >
           <ArrowLeft />
@@ -90,7 +121,7 @@ export default function PartnerKitOrderPage() {
         {step === 1 && (
           <>
             <div className="flex justify-center mt-6">
-              <img src={KitImage} className="w-64" />
+              <img src={KitImage} className="w-64" alt="Partner kit" />
             </div>
 
             <h2 className="text-xl font-bold text-center mt-6">
@@ -105,20 +136,57 @@ export default function PartnerKitOrderPage() {
               onClick={() => setStep(2)}
               className="mt-10 w-full bg-orange-500 text-white py-3 rounded-xl font-semibold"
             >
+              Continue
+            </button>
+          </>
+        )}
+
+        {/* ================= STEP 2 – WHAT'S INCLUDED ================= */}
+        {step === 2 && (
+          <>
+            <h2 className="text-lg font-semibold mb-1">
+              What's in your kit
+            </h2>
+            <p className="text-sm text-gray-500 mb-6">
+              Everything you need to start delivering
+            </p>
+
+            <div className="space-y-4">
+              <KitItem
+                icon={<Shirt size={22} className="text-orange-500" />}
+                title="2 Delivery T-Shirts"
+                subtitle="Free — no charge"
+              />
+              <KitItem
+                icon={<Backpack size={22} className="text-orange-500" />}
+                title="Insulated Delivery Bag"
+                subtitle="One-time payment applies"
+              />
+              <KitItem
+                icon={<IdCard size={22} className="text-orange-500" />}
+                title="Partner ID Card"
+                subtitle="Required for order pickups"
+              />
+            </div>
+
+            <button
+              onClick={() => setStep(3)}
+              className="mt-10 w-full bg-orange-500 text-white py-3 rounded-xl font-semibold"
+            >
               Select T-shirt size
             </button>
           </>
         )}
 
-        {/* ================= STEP 2 – SIZE ================= */}
-        {step === 2 && (
+        {/* ================= STEP 3 – SIZE SELECTION + SUBMIT ================= */}
+        {step === 3 && (
           <>
             <h2 className="text-lg font-semibold mb-4">
               Select T-shirt Size
             </h2>
 
             <div className="flex justify-center mb-6">
-              <img src={TshirtModel} className="w-48" />
+              <img src={TshirtModel} className="w-48" alt="T-shirt size guide" />
             </div>
 
             <div className="flex gap-3 justify-center">
@@ -126,6 +194,7 @@ export default function PartnerKitOrderPage() {
                 <button
                   key={s}
                   onClick={() => setSize(s)}
+                  disabled={submitting}
                   className={`w-12 h-12 rounded-full border ${
                     size === s
                       ? "bg-orange-500 text-white border-orange-500"
@@ -138,316 +207,33 @@ export default function PartnerKitOrderPage() {
             </div>
 
             <button
-              disabled={!size}
-              onClick={async () => {
-  if (!size) return;
-
-  try {
-    await submitPartnerKit({
-      tshirt_size: size,
-    });
-
-    console.log("Partner kit submitted ✅");
-
-    // ✅ SAVE LOCAL
-    localStorage.setItem(
-      "partner_kit",
-      JSON.stringify({
-        tshirt_size: size,
-        delivery_type: "pickup",
-      })
-    );
-
-    // ✅ UPDATE PROGRESS
-    const existing =
-      JSON.parse(localStorage.getItem("onboarding_progress")) || {};
-
-    localStorage.setItem(
-      "onboarding_progress",
-      JSON.stringify({
-        ...existing,
-        kit_ordered: true,
-      })
-    );
-
-    // 👉 move to success screen
-    setStep(3);
-
-  } catch (err) {
-    console.error("Partner kit API error ❌", err);
-    alert("Failed to submit partner kit");
-  }
-}}
+              disabled={!size || submitting}
+              onClick={handleSubmitKit}
               className={`mt-10 w-full py-3 rounded-xl font-semibold ${
-                size
+                size && !submitting
                   ? "bg-orange-500 text-white"
                   : "bg-gray-200 text-gray-400"
               }`}
             >
-              Continue
+              {submitting ? "Submitting..." : "Continue"}
             </button>
           </>
         )}
-
-        {/* ================= STEP 3 – ADDRESS ================= */}
-    {/* {step === 3 && (
-     <>
-     <h2 className="text-lg font-semibold mb-4">
-      Shipping address for t-shirt/bag delivery
-     </h2>
-
-    <input
-      placeholder="House / Flat number"
-      value={address.house}
-      onChange={(e) =>
-        setAddress({ ...address, house: e.target.value })
-      }
-      className="w-full border rounded-xl px-4 py-3 mb-3"
-    />
-
-    <input
-      placeholder="Building / Locality"
-      value={address.locality}
-      onChange={(e) =>
-        setAddress({ ...address, locality: e.target.value })
-      }
-      className="w-full border rounded-xl px-4 py-3 mb-3"
-    />
-
-    <input
-      placeholder="Landmark (optional)"
-      value={address.landmark}
-      onChange={(e) =>
-        setAddress({ ...address, landmark: e.target.value })
-      }
-      className="w-full border rounded-xl px-4 py-3 mb-3"
-    />
-
-    <input
-      placeholder="Pin code"
-      value={address.pincode}
-      onChange={(e) =>
-        setAddress({ ...address, pincode: e.target.value })
-      }
-      className="w-full border rounded-xl px-4 py-3 mb-3"
-    />
-
-    <input
-      placeholder="City"
-      value={address.city}
-      onChange={(e) =>
-        setAddress({ ...address, city: e.target.value })
-      }
-      className="w-full border rounded-xl px-4 py-3 mb-3"
-    />
-
-    <input
-      placeholder="State"
-      value={address.state}
-      onChange={(e) =>
-        setAddress({ ...address, state: e.target.value })
-      }
-      className="w-full border rounded-xl px-4 py-3 mb-3"
-    />
-
-   <button
-  disabled={
-    !address.house ||
-    !address.locality ||
-    !address.pincode ||
-    !address.city ||
-    !address.state
-  }
-  onClick={() => setStep(4)}
-  className={`mt-6 w-full py-3 rounded-xl font-semibold ${
-    address.house &&
-    address.locality &&
-    address.pincode &&
-    address.city &&
-    address.state
-      ? "bg-orange-500 text-white"
-      : "bg-gray-200 text-gray-400 cursor-not-allowed"
-  }`}
->
-  Continue
-</button>
-
-  </>
-)} */}
-
-        {/* ================= STEP 4 – CONFIRM ================= */}
-    {/* {step === 4 && (
-       <>
-        <img
-            src={DeliveryConfirm}
-            className="w-full h-64 object-cover rounded-xl"
-        />
-
-    {/* 📍 ADDRESS PREVIEW */}
-    {/* <div className="bg-gray-50 border rounded-xl p-4 mt-4 text-sm">
-      <p className="font-semibold text-gray-900 mb-1">
-        Deliver to this address:
-      </p>
-
-      <p>
-        {address.house}, {address.locality}
-      </p>
-
-      {address.landmark && (
-        <p>Near {address.landmark}</p>
-      )}
-
-      <p>
-        {address.city}, {address.state} – {address.pincode}
-      </p>
-    </div>
-
-    <button
-      onClick={() => setStep(5)}
-      className="mt-6 w-full bg-orange-500 text-white py-3 rounded-xl font-semibold"
-    >
-      Yes, deliver here
-    </button>
-
-    <button
-      onClick={() => setStep(3)}
-      className="mt-3 w-full border border-orange-500 text-orange-500 py-3 rounded-xl font-semibold"
-    >
-      No, change address
-    </button>
-  </>
-)} */}
-
-        {/* ================= STEP 5 – PAYMENT ================= */}
-{/* ================= STEP 3 – COLLECT + PAYMENT ================= */}
-{/* {step === 3 && (
-  <>
-    <h2 className="text-lg font-semibold mb-4">
-      Collect Partner Kit
-    </h2> */}
-
-    {/* 📍 INFO */}
-    {/* <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-4">
-      <p className="text-sm text-green-700 font-medium">
-        🎉 Your kit will be ready for pickup
-      </p>
-      <p className="text-xs text-gray-600 mt-1">
-        Collect from your nearest Zatpatt hub after payment
-      </p>
-    </div>
-
-    {/* PAYMENT OPTIONS */}
-    {/* <h3 className="text-sm font-semibold mb-2">
-      Choose Payment Option
-    </h3>
-
-    <PaymentOption
-      checked={paymentMode === "now"}
-      onClick={() => setPaymentMode("now")}
-      title="Pay Now"
-      subtitle="₹1,599 (₹400 discount)"
-    />
-
-    <PaymentOption
-      checked={paymentMode === "installments"}
-      onClick={() => setPaymentMode("installments")}
-      title="Pay in Installments"
-      subtitle="₹499 now" */}
-    
-
-    {/* CTA */}
-    {/* <button
-      onClick={async () => {
-        if (!size) {
-          alert("Please select T-shirt size");
-          return;
-        }
-
-        try {
-          // ✅ FINAL STEP API
-          await submitPartnerKit({
-            tshirt_size: size,
-          });
-
-          console.log("Partner kit submitted ✅");
-
-          // ✅ SAVE LOCAL
-          localStorage.setItem(
-            "partner_kit",
-            JSON.stringify({
-              tshirt_size: size,
-              payment_mode: paymentMode,
-              delivery_type: "pickup", // 👈 important
-            })
-          );
-
-          // ✅ UPDATE PROGRESS
-          const existing =
-            JSON.parse(localStorage.getItem("onboarding_progress")) || {};
-
-          localStorage.setItem(
-            "onboarding_progress",
-            JSON.stringify({
-              ...existing,
-              kit_ordered: true,
-            })
-          );
-
-          // ✅ REDIRECT
-          navigate("/payment-success", { replace: true });
-
-        } catch (err) {
-          console.error("Partner kit API error ❌", err);
-          alert("Failed to submit partner kit");
-        }
-      }}
-      className="mt-8 w-full bg-orange-500 text-white py-3 rounded-xl font-semibold"
-    >
-      Proceed to Pay
-    </button>
-  </>
-)} */}
-
-{step === 3 && (
-  <>
-    <h2 className="text-lg font-semibold mb-4">
-      🎉 You're All Set!
-    </h2>
-
-    <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-      <p className="text-sm text-green-700 font-medium">
-        Your partner kit request has been submitted successfully
-      </p>
-
-      <p className="text-sm text-gray-700 mt-2">
-        Please collect your bag & T-shirts from the nearest
-        <span className="font-semibold"> Zatpatt office</span>
-      </p>
-    </div>
-
-    <button
-      onClick={() => navigate("/verification-pending", { replace: true })}
-      className="mt-8 w-full bg-orange-500 text-white py-3 rounded-xl font-semibold"
-    >
-      Continue
-    </button>
-  </>
-)}
       </div>
     </div>
   );
 }
 
-function PaymentOption({ checked, onClick, title, subtitle }) {
+function KitItem({ icon, title, subtitle }) {
   return (
-    <div
-      onClick={onClick}
-      className={`border rounded-xl p-4 mb-3 cursor-pointer ${
-        checked ? "border-orange-500 bg-orange-50" : ""
-      }`}
-    >
-      <p className="font-semibold">{title}</p>
-      <p className="text-xs text-gray-500">{subtitle}</p>
+    <div className="flex items-center gap-4 p-4 rounded-xl bg-orange-50">
+      <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm">
+        {icon}
+      </div>
+      <div>
+        <p className="text-sm font-semibold text-gray-900">{title}</p>
+        <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>
+      </div>
     </div>
   );
 }
