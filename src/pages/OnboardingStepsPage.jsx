@@ -604,7 +604,7 @@ export default function OnboardingStepsPage() {
           <StepItem
             step={3}
             title="Order Zatpatt Partner Kit"
-            subtitle="2 Free T-Shirts, Delivery Bag & Partner ID"
+            subtitle="T-Shirts, Delivery Bag"
             icon={<FileText size={20} />}
             status={
               !workDone || !personalDone
