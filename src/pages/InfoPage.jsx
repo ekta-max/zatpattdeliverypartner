@@ -5,24 +5,37 @@ import { useNavigate } from "react-router-dom";
 import { Wallet, Clock, TrendingUp, ArrowRight } from "lucide-react";
 import { LanguageContext } from "../context/LanguageContext";
 
-/* Slides */
+/* 3D Animated Slides */
 import Slide1 from "../assets/onboarding/slide1.png";
 import Slide2 from "../assets/onboarding/slide2.png";
 import Slide3 from "../assets/onboarding/slide3.png";
 
+/* =========================================================
+   THEME — ORANGE & PEACH PREMIUM DASHBOARD
+========================================================= */
+
+const PRIMARY_ORANGE = "#EA580C";
+const PRIMARY_ORANGE_LIGHT = "#FB923C";
+const GOLD_ACCENT = "#F5B841";
+
+const PEACH_SOFT = "#FFF3E8";
+const PEACH_DEEP = "#FFE0C7";
+const CREAM_BG = "#FFFAF5";
+
+const TEXT_PRIMARY = "#2E1A0F";
+const TEXT_SECONDARY = "#8A6F5E";
+const TEXT_MUTED = "#B79C89";
+
+const CARD_BORDER = "#FFE0C7";
+
 const SLIDES = [
   {
     image: Slide1,
-    title: "Earn up to ₹60,000 per month",
-    subtitle: "Join 5 Lakh+ Happy\nDelivery Partners!",
-  },
-  {
-    image: Slide2,
     title: "Flexible Timings.",
     subtitle: "Work in Areas you want",
   },
   {
-    image: Slide3,
+    image: Slide2,
     title: "Weekly Payouts",
     subtitle: "Direct bank transfer",
   },
@@ -36,11 +49,7 @@ const HIGHLIGHTS = [
   {
     icon: Clock,
     label: "Flexible Hours",
-  },
-  {
-    icon: TrendingUp,
-    label: "Earn ₹60k+/mo",
-  },
+  }
 ];
 
 export default function InfoPage() {
@@ -56,12 +65,10 @@ export default function InfoPage() {
   useEffect(() => {
     const timer = setInterval(() => {
       setIndex((current) => (current + 1) % SLIDES.length);
-    }, 3500);
+    }, 3800);
 
     return () => clearInterval(timer);
   }, []);
-
-  const slide = SLIDES[index];
 
   return (
     <div
@@ -71,65 +78,62 @@ export default function InfoPage() {
         overflow-hidden
         flex
         flex-col
-        bg-[#fffaf5]
       "
+      style={{
+        background: CREAM_BG,
+      }}
     >
       {/* ==========================================
-          HERO
+          HERO & 3D CHARACTER SLIDER
       ========================================== */}
 
-      <div className="relative flex-1 min-h-0 w-full overflow-hidden">
-        {/* SLIDE IMAGE */}
+      <div className="relative flex-1 min-h-0 w-full overflow-hidden bg-amber-50">
+        {/* CROSS-FADE SLIDES */}
+        {SLIDES.map((slide, i) => (
+          <img
+            key={i}
+            src={slide.image}
+            alt={slide.title}
+            className={`
+              absolute
+              inset-0
+              w-full
+              h-full
+              object-cover
+              object-center
+              transition-all
+              duration-700
+              ease-in-out
+              ${i === index ? "opacity-100 scale-100" : "opacity-0 scale-105"}
+            `}
+          />
+        ))}
 
-        <img
-          src={slide.image}
-          className="
-            absolute
-            inset-0
-            w-full
-            h-full
-            object-cover
-            object-center
-          "
-          alt=""
-        />
-
-        {/* MERCHANT THEME OVERLAY */}
-
+        {/* WARM TOP & BOTTOM GRADIENT OVERLAY */}
         <div
           className="
             absolute
             inset-0
-            bg-gradient-to-b
-            from-[#ff6b00]/10
-            via-black/30
-            to-black/75
-          "
-        />
-
-        {/* SUBTLE ORANGE GLOW */}
-
-        <div
-          className="
-            absolute
-            top-[-100px]
-            right-[-100px]
-            w-[260px]
-            h-[260px]
-            rounded-full
-            bg-[#ff7a00]/20
-            blur-3xl
             pointer-events-none
           "
+          style={{
+            background: `linear-gradient(
+              180deg,
+              rgba(35, 18, 10, 0.70) 0%,
+              rgba(35, 18, 10, 0.15) 35%,
+              rgba(234, 88, 12, 0.05) 60%,
+              rgba(46, 26, 15, 0.65) 100%
+            )`,
+          }}
         />
 
         {/* HERO CONTENT */}
-
         <div
           className="
-            absolute
-            top-7
-            sm:top-9
+            relative
+            z-10
+            top-6
+            sm:top-8
             left-5
             right-5
             sm:left-7
@@ -138,7 +142,6 @@ export default function InfoPage() {
           "
         >
           {/* BRAND BADGE */}
-
           <div
             className="
               inline-flex
@@ -147,37 +150,30 @@ export default function InfoPage() {
               px-3
               py-1.5
               rounded-full
-              bg-white/15
-              border
-              border-white/20
               backdrop-blur-md
-              mb-4
+              mb-3
             "
+            style={{
+              background: "rgba(255,255,255,0.2)",
+              border: "1px solid rgba(245,184,65,0.4)",
+            }}
           >
             <span
-              className="
-                w-2
-                h-2
-                rounded-full
-                bg-white
-                shadow-[0_0_0_4px_rgba(255,255,255,0.12)]
-              "
+              className="w-2 h-2 rounded-full"
+              style={{
+                background: GOLD_ACCENT,
+                boxShadow: "0 0 0 4px rgba(245,184,65,0.25)",
+              }}
             />
-
             <span
-              className="
-                text-[9px]
-                sm:text-[10px]
-                font-extrabold
-                tracking-[1.5px]
-              "
+              className="text-[9px] sm:text-[10px] font-extrabold tracking-[1.5px]"
+              style={{ color: GOLD_ACCENT }}
             >
               ZATPATT
             </span>
           </div>
 
           {/* TITLE */}
-
           <h1
             className="
               text-[22px]
@@ -187,37 +183,38 @@ export default function InfoPage() {
               leading-tight
               tracking-tight
               max-w-[340px]
+              drop-shadow-md
             "
           >
-            {slide.title}
+            {SLIDES[index].title}
           </h1>
 
           {/* SUBTITLE */}
-
           <p
             className="
               text-[12px]
               sm:text-[13px]
               md:text-sm
               whitespace-pre-line
-              opacity-90
-              mt-2
+              opacity-95
+              mt-1.5
               leading-relaxed
               max-w-[300px]
+              drop-shadow-md
             "
           >
-            {slide.subtitle}
+            {SLIDES[index].subtitle}
           </p>
         </div>
 
         {/* SLIDE INDICATORS */}
-
         <div
           className="
             absolute
-            bottom-5
+            bottom-6
             left-0
             right-0
+            z-10
             flex
             justify-center
             items-center
@@ -230,17 +227,14 @@ export default function InfoPage() {
               type="button"
               onClick={() => setIndex(i)}
               aria-label={`Go to slide ${i + 1}`}
-              className={`
-                h-[4px]
-                rounded-full
-                transition-all
-                duration-300
-                ${
+              className="h-[4px] rounded-full transition-all duration-300"
+              style={{
+                width: i === index ? "32px" : "18px",
+                background:
                   i === index
-                    ? "w-8 bg-white"
-                    : "w-5 bg-white/40"
-                }
-              `}
+                    ? GOLD_ACCENT
+                    : "rgba(255,255,255,0.5)",
+              }}
             />
           ))}
         </div>
@@ -256,7 +250,6 @@ export default function InfoPage() {
           z-10
           shrink-0
           -mt-5
-          bg-white
           rounded-t-[28px]
           px-5
           sm:px-6
@@ -264,120 +257,95 @@ export default function InfoPage() {
           pt-6
           sm:pt-7
           pb-[max(18px,env(safe-area-inset-bottom))]
-          shadow-[0_-12px_40px_rgba(80,48,20,0.12)]
         "
+        style={{
+          background: "#ffffff",
+          boxShadow: "0 -12px 40px rgba(234,88,12,0.14)",
+        }}
       >
         <div className="w-full max-w-xl mx-auto">
           {/* HEADING */}
-
           <h2
             className="
               text-[16px]
               sm:text-lg
               md:text-xl
               font-semibold
-              text-[#ff6b00]
               text-center
               leading-snug
             "
+            style={{ color: PRIMARY_ORANGE }}
           >
             <span className="mr-1">🚀</span>
-
-            <span className="font-extrabold">
+            <span className="font-extrabold" style={{ color: TEXT_PRIMARY }}>
               Deliver orders easily
             </span>
-
-            <span> with your </span>
-
-            <span className="font-extrabold">
-              ZATPATT
-            </span>
+            <span style={{ color: TEXT_SECONDARY }}> with </span>
+            <span className="font-extrabold">ZATPATT</span>
           </h2>
 
-          {/* ==========================================
-              QUICK HIGHLIGHTS
-          ========================================== */}
-
-          <div
-            className="
-              mt-5
-              grid
-              grid-cols-3
-              gap-2
-              sm:gap-3
-            "
-          >
-            {HIGHLIGHTS.map(
-              ({ icon: Icon, label }) => (
+          {/* QUICK HIGHLIGHTS */}
+          <div className="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
+            {HIGHLIGHTS.map(({ icon: Icon, label }) => (
+              <div
+                key={label}
+                className="
+                  flex
+                  flex-col
+                  items-center
+                  justify-center
+                  text-center
+                  gap-2
+                  py-3
+                  sm:py-4
+                  px-1
+                  rounded-xl
+                  sm:rounded-2xl
+                  border
+                  transition-all
+                  duration-200
+                "
+                style={{
+                  background: PEACH_SOFT,
+                  borderColor: CARD_BORDER,
+                }}
+              >
                 <div
-                  key={label}
                   className="
+                    w-9
+                    h-9
+                    sm:w-10
+                    sm:h-10
+                    rounded-xl
                     flex
-                    flex-col
                     items-center
                     justify-center
-                    text-center
-                    gap-2
-                    py-3
-                    sm:py-4
-                    px-1
-                    rounded-xl
-                    sm:rounded-2xl
-                    bg-[#fff3e8]
-                    border
-                    border-[#ffe0c7]
-                    transition-all
-                    duration-200
                   "
+                  style={{
+                    background: `linear-gradient(135deg, ${PRIMARY_ORANGE} 0%, ${PRIMARY_ORANGE_LIGHT} 60%, ${GOLD_ACCENT} 100%)`,
+                    boxShadow: "0 6px 14px rgba(234,88,12,0.22)",
+                  }}
                 >
-                  {/* ICON */}
-
-                  <div
-                    className="
-                      w-9
-                      h-9
-                      sm:w-10
-                      sm:h-10
-                      rounded-xl
-                      flex
-                      items-center
-                      justify-center
-                      bg-gradient-to-br
-                      from-[#ff6b00]
-                      to-[#ff8a00]
-                      shadow-[0_6px_14px_rgba(255,107,0,0.18)]
-                    "
-                  >
-                    <Icon
-                      size={18}
-                      className="text-white"
-                      strokeWidth={2.2}
-                    />
-                  </div>
-
-                  {/* LABEL */}
-
-                  <span
-                    className="
-                      text-[10px]
-                      sm:text-[11px]
-                      md:text-xs
-                      font-semibold
-                      text-[#344054]
-                      leading-tight
-                    "
-                  >
-                    {label}
-                  </span>
+                  <Icon size={18} className="text-white" strokeWidth={2.2} />
                 </div>
-              )
-            )}
+
+                <span
+                  className="
+                    text-[10px]
+                    sm:text-[11px]
+                    md:text-xs
+                    font-semibold
+                    leading-tight
+                  "
+                  style={{ color: TEXT_PRIMARY }}
+                >
+                  {label}
+                </span>
+              </div>
+            ))}
           </div>
 
-          {/* ==========================================
-              GET STARTED BUTTON
-          ========================================== */}
-
+          {/* GET STARTED BUTTON */}
           <button
             type="button"
             onClick={() => navigate("/login")}
@@ -395,59 +363,41 @@ export default function InfoPage() {
               py-3
               rounded-xl
               sm:rounded-2xl
-              bg-gradient-to-r
-              from-[#ff6b00]
-              via-[#ff7a00]
-              to-[#ff8a00]
               text-white
               text-sm
               sm:text-base
               font-extrabold
-              shadow-[0_10px_22px_rgba(255,107,0,0.22)]
-              hover:shadow-[0_14px_28px_rgba(255,107,0,0.28)]
-              hover:-translate-y-[1px]
-              active:translate-y-0
-              active:shadow-[0_7px_16px_rgba(255,107,0,0.2)]
               transition-all
               duration-200
+              hover:-translate-y-[1px]
+              active:translate-y-0
               focus:outline-none
               focus:ring-2
-              focus:ring-[#ff7a00]/30
               focus:ring-offset-2
             "
+            style={{
+              background: `linear-gradient(90deg, ${PRIMARY_ORANGE} 0%, ${PRIMARY_ORANGE_LIGHT} 55%, ${GOLD_ACCENT} 100%)`,
+              boxShadow: "0 10px 22px rgba(234,88,12,0.28)",
+            }}
           >
             <span>Get Started</span>
-
             <ArrowRight
               size={18}
-              className="
-                transition-transform
-                duration-200
-                group-hover:translate-x-1
-              "
+              className="transition-transform duration-200 group-hover:translate-x-1"
             />
           </button>
 
-          {/* ==========================================
-              TERMS
-          ========================================== */}
-
+          {/* TERMS */}
           <p
-            className="
-              mt-3
-              text-[10px]
-              sm:text-[11px]
-              text-[#98a2b3]
-              text-center
-              leading-relaxed
-            "
+            className="mt-3 text-[10px] sm:text-[11px] text-center leading-relaxed"
+            style={{ color: TEXT_MUTED }}
           >
             By continuing you agree to our{" "}
-            <span className="text-[#ff6b00] font-medium">
+            <span className="font-medium" style={{ color: PRIMARY_ORANGE }}>
               Terms
             </span>{" "}
             &{" "}
-            <span className="text-[#ff6b00] font-medium">
+            <span className="font-medium" style={{ color: PRIMARY_ORANGE }}>
               Privacy Policy
             </span>
           </p>
