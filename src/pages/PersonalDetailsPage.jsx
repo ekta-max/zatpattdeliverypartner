@@ -2099,7 +2099,7 @@ export default function PersonalDetailsPage() {
                   <Camera size={20} />
 
                   <span>
-                    Open Camera & Take Selfie
+                    Take Selfie
                   </span>
                 </button>
               )}
