@@ -1,10 +1,15 @@
-//src\pages\PartnerKitOrderPage.jsx
+// src/pages/PartnerKitOrderPage.jsx
 
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, HelpCircle, Shirt, Backpack, IdCard } from "lucide-react";
+import {
+  ArrowLeft,
+  HelpCircle,
+  Shirt,
+  Backpack,
+  IdCard,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-import KitImage from "../assets/partner-kit.png";
 import TshirtModel from "../assets/tshirt-model.png";
 import { DEV_MODE } from "../config/appConfig";
 import { submitPartnerKit } from "../Services/partnerkit";
@@ -14,39 +19,80 @@ const SIZES = ["S", "M", "L", "XL", "2XL"];
 
 export default function PartnerKitOrderPage() {
   const navigate = useNavigate();
-  const [step, setStep] = useState(1);
 
   const [size, setSize] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const progressPercent = (step / 3) * 100;
+  /*
+   * ===========================================================
+   * CHECK ONBOARDING ACCESS
+   * ===========================================================
+   */
 
   useEffect(() => {
     const progress = JSON.parse(
       localStorage.getItem("onboarding_progress")
     );
 
-    if (!DEV_MODE && progress?.personal_details !== "completed") {
-      navigate("/personal-details");
+    /*
+     * Personal details must be completed
+     * before coming to partner kit page.
+     */
+
+    if (
+      !DEV_MODE &&
+      progress?.personal_details !== "completed"
+    ) {
+      navigate("/personal-details", { replace: true });
+      return;
     }
 
+    /*
+     * If kit is already ordered,
+     * don't allow ordering again.
+     */
+
     if (progress?.kit_ordered === true) {
-      navigate("/verification-pending", { replace: true });
+      navigate("/verification-pending", {
+        replace: true,
+      });
     }
   }, [navigate]);
 
+  /*
+   * ===========================================================
+   * SUBMIT PARTNER KIT
+   * ===========================================================
+   */
+
   const handleSubmitKit = async () => {
-    if (!size || submitting) return;
+    if (!size || submitting) {
+      return;
+    }
 
     setSubmitting(true);
 
     try {
-      // ✅ STEP 1: submit the kit selection
+      /*
+       * =======================================================
+       * STEP 1
+       * Submit T-shirt size
+       * =======================================================
+       */
+
       await submitPartnerKit({
         tshirt_size: size,
       });
 
-      console.log("Partner kit submitted ✅");
+      console.log(
+        "Partner kit submitted successfully"
+      );
+
+      /*
+       * =======================================================
+       * SAVE KIT DATA LOCALLY
+       * =======================================================
+       */
 
       localStorage.setItem(
         "partner_kit",
@@ -56,183 +102,346 @@ export default function PartnerKitOrderPage() {
         })
       );
 
-      const existing =
-        JSON.parse(localStorage.getItem("onboarding_progress")) || {};
+      /*
+       * =======================================================
+       * UPDATE ONBOARDING PROGRESS
+       * =======================================================
+       */
+
+      const existingProgress =
+        JSON.parse(
+          localStorage.getItem(
+            "onboarding_progress"
+          )
+        ) || {};
 
       localStorage.setItem(
         "onboarding_progress",
         JSON.stringify({
-          ...existing,
+          ...existingProgress,
           kit_ordered: true,
         })
       );
 
-      // ✅ STEP 2: immediately check verification status
+      /*
+       * =======================================================
+       * STEP 2
+       * GET DELIVERY PARTNER PROFILE
+       * =======================================================
+       */
+
       const profileRes = await getMyProfileDp();
-      const isVerified = profileRes?.data?.is_verified;
 
-      console.log("Profile check ✅", profileRes);
+      console.log(
+        "Profile check:",
+        profileRes
+      );
 
-      // ✅ STEP 3: route based on is_verified
+      const isVerified =
+        profileRes?.data?.is_verified;
+
+      /*
+       * =======================================================
+       * STEP 3
+       * REDIRECT BASED ON VERIFICATION
+       * =======================================================
+       */
+
       if (isVerified) {
-        navigate("/training-intro", { replace: true }); // 👈 changed from /seva-slots
+        navigate("/training-intro", {
+          replace: true,
+        });
       } else {
-        navigate("/verification-pending", { replace: true });
+        navigate("/verification-pending", {
+          replace: true,
+        });
       }
-    } catch (err) {
-      console.error("Partner kit / profile check API error ❌", err);
-      alert("Failed to submit partner kit");
+    } catch (error) {
+      console.error(
+        "Partner kit submission/profile check failed:",
+        error
+      );
+
+      alert(
+        "Failed to submit partner kit. Please try again."
+      );
     } finally {
       setSubmitting(false);
     }
   };
 
+  /*
+   * ===========================================================
+   * PAGE
+   * ===========================================================
+   */
+
   return (
     <div className="min-h-screen bg-white flex flex-col">
-      {/* ===== HEADER ===== */}
-      <div className="flex items-center px-4 py-3 border-b">
+
+      {/* =======================================================
+          HEADER
+      ======================================================= */}
+
+      <div className="flex items-center px-4 py-3 border-b bg-white">
+
+        {/* BACK BUTTON */}
+
         <button
-          onClick={() => {
-            if (step > 1) setStep(step - 1);
-          }}
+          type="button"
+          onClick={() => navigate(-1)}
+          className="
+            w-9
+            h-9
+            rounded-full
+            flex
+            items-center
+            justify-center
+            hover:bg-gray-100
+            transition
+          "
         >
-          <ArrowLeft />
+          <ArrowLeft size={21} />
         </button>
-        <h1 className="flex-1 text-center font-semibold">
+
+        {/* TITLE */}
+
+        <h1 className="flex-1 text-center font-semibold text-gray-900">
           Zatpatt Partner Kit
         </h1>
-        <HelpCircle className="text-orange-500" />
-      </div>
 
-      {/* ===== PROGRESS BAR ===== */}
-      <div className="px-4 mt-3">
-        <div className="h-1 bg-gray-200 rounded">
-          <div
-            className="h-1 bg-orange-500 rounded transition-all"
-            style={{ width: `${progressPercent}%` }}
+        {/* HELP */}
+
+        <button
+          type="button"
+          className="
+            w-9
+            h-9
+            rounded-full
+            flex
+            items-center
+            justify-center
+          "
+        >
+          <HelpCircle
+            size={21}
+            className="text-orange-500"
           />
-        </div>
+        </button>
       </div>
 
-      {/* ===== CONTENT ===== */}
-      <div className="flex-1 px-4 pt-6">
+      {/* =======================================================
+          CONTENT
+      ======================================================= */}
 
-        {/* ================= STEP 1 – INTRO ================= */}
-        {step === 1 && (
-          <>
-            <div className="flex justify-center mt-6">
-              <img src={KitImage} className="w-64" alt="Partner kit" />
-            </div>
+      <div className="flex-1 px-4 py-6">
 
-            <h2 className="text-xl font-bold text-center mt-6">
-              Earn upto ₹5000 in first week!
-            </h2>
+        <div className="max-w-xl mx-auto">
 
-            <p className="text-sm text-gray-500 text-center mt-2">
-              Pay only for bag and get 2 T-shirts free
-            </p>
+          {/* =================================================
+              T-SHIRT SIZE
+          ================================================= */}
 
-            <button
-              onClick={() => setStep(2)}
-              className="mt-10 w-full bg-orange-500 text-white py-3 rounded-xl font-semibold"
-            >
-              Continue
-            </button>
-          </>
-        )}
+          <div>
 
-        {/* ================= STEP 2 – WHAT'S INCLUDED ================= */}
-        {step === 2 && (
-          <>
-            <h2 className="text-lg font-semibold mb-1">
-              What's in your kit
-            </h2>
-            <p className="text-sm text-gray-500 mb-6">
-              Everything you need to start delivering
-            </p>
-
-            <div className="space-y-4">
-              <KitItem
-                icon={<Shirt size={22} className="text-orange-500" />}
-                title="2 Delivery T-Shirts"
-                subtitle="Free — no charge"
-              />
-              <KitItem
-                icon={<Backpack size={22} className="text-orange-500" />}
-                title="Insulated Delivery Bag"
-                subtitle="One-time payment applies"
-              />
-              <KitItem
-                icon={<IdCard size={22} className="text-orange-500" />}
-                title="Partner ID Card"
-                subtitle="Required for order pickups"
-              />
-            </div>
-
-            <button
-              onClick={() => setStep(3)}
-              className="mt-10 w-full bg-orange-500 text-white py-3 rounded-xl font-semibold"
-            >
-              Select T-shirt size
-            </button>
-          </>
-        )}
-
-        {/* ================= STEP 3 – SIZE SELECTION + SUBMIT ================= */}
-        {step === 3 && (
-          <>
-            <h2 className="text-lg font-semibold mb-4">
+            <h3 className="text-base font-semibold text-gray-900">
               Select T-shirt Size
-            </h2>
+            </h3>
 
-            <div className="flex justify-center mb-6">
-              <img src={TshirtModel} className="w-48" alt="T-shirt size guide" />
+            <p className="text-sm text-gray-500 mt-1">
+              Choose the size you want for your partner kit.
+            </p>
+
+            {/* T-SHIRT IMAGE */}
+
+            <div className="flex justify-center my-6">
+
+              <div
+                className="
+                  w-full
+                  max-w-[260px]
+                  rounded-2xl
+                  bg-orange-50
+                  flex
+                  items-center
+                  justify-center
+                  p-4
+                "
+              >
+                <img
+                  src={TshirtModel}
+                  className="w-48 h-auto object-contain"
+                  alt="T-shirt size guide"
+                />
+              </div>
+
             </div>
 
-            <div className="flex gap-3 justify-center">
-              {SIZES.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setSize(s)}
-                  disabled={submitting}
-                  className={`w-12 h-12 rounded-full border ${
-                    size === s
-                      ? "bg-orange-500 text-white border-orange-500"
-                      : "border-gray-300"
-                  }`}
+            {/* SIZE BUTTONS */}
+
+            <div className="flex gap-2 justify-center flex-wrap">
+
+              {SIZES.map((s) => {
+
+                const selected = size === s;
+
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setSize(s)}
+                    disabled={submitting}
+                    className={`
+                      w-10
+                      h-10
+                      rounded-full
+                      border-2
+                      text-sm
+                      font-semibold
+                      transition-all
+                      ${
+                        selected
+                          ? "bg-orange-500 text-white border-orange-500 shadow-md scale-105"
+                          : "bg-white text-gray-700 border-gray-300 hover:border-orange-400 hover:text-orange-500"
+                      }
+                      ${
+                        submitting
+                          ? "opacity-50 cursor-not-allowed"
+                          : "cursor-pointer"
+                      }
+                    `}
+                  >
+                    {s}
+                  </button>
+                );
+
+              })}
+
+            </div>
+
+            {/* SELECTED SIZE */}
+
+            {size && (
+              <div className="mt-4 text-center">
+
+                <span
+                  className="
+                    inline-flex
+                    items-center
+                    px-4
+                    py-2
+                    rounded-full
+                    bg-orange-50
+                    text-orange-600
+                    text-sm
+                    font-semibold
+                  "
                 >
-                  {s}
-                </button>
-              ))}
-            </div>
+                  Selected Size: {size}
+                </span>
 
-            <button
-              disabled={!size || submitting}
-              onClick={handleSubmitKit}
-              className={`mt-10 w-full py-3 rounded-xl font-semibold ${
+              </div>
+            )}
+
+          </div>
+
+          {/* =================================================
+              CONTINUE BUTTON
+          ================================================= */}
+
+          <button
+            type="button"
+            disabled={!size || submitting}
+            onClick={handleSubmitKit}
+            className={`
+              mt-8
+              w-full
+              py-3.5
+              rounded-xl
+              font-semibold
+              transition-all
+              ${
                 size && !submitting
-                  ? "bg-orange-500 text-white"
-                  : "bg-gray-200 text-gray-400"
-              }`}
-            >
-              {submitting ? "Submitting..." : "Continue"}
-            </button>
-          </>
-        )}
+                  ? "bg-orange-500 text-white hover:bg-orange-600 shadow-md"
+                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
+              }
+            `}
+          >
+            {submitting
+              ? "Submitting..."
+              : "Continue"}
+          </button>
+
+          {/* =================================================
+              INFO
+          ================================================= */}
+
+          <p className="text-center text-xs text-gray-400 mt-3">
+            You can select your T-shirt size before submitting
+            your partner kit order.
+          </p>
+
+        </div>
       </div>
     </div>
   );
 }
 
-function KitItem({ icon, title, subtitle }) {
+/*
+ * =============================================================
+ * KIT ITEM COMPONENT
+ * =============================================================
+ */
+
+function KitItem({
+  icon,
+  title,
+  subtitle,
+}) {
   return (
-    <div className="flex items-center gap-4 p-4 rounded-xl bg-orange-50">
-      <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm">
+    <div
+      className="
+        flex
+        items-center
+        gap-4
+        p-4
+        rounded-xl
+        bg-orange-50
+        border
+        border-orange-100
+      "
+    >
+
+      {/* ICON */}
+
+      <div
+        className="
+          w-11
+          h-11
+          rounded-full
+          bg-white
+          flex
+          items-center
+          justify-center
+          shadow-sm
+          shrink-0
+        "
+      >
         {icon}
       </div>
-      <div>
-        <p className="text-sm font-semibold text-gray-900">{title}</p>
-        <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>
+
+      {/* TEXT */}
+
+      <div className="min-w-0">
+
+        <p className="text-sm font-semibold text-gray-900">
+          {title}
+        </p>
+
+        <p className="text-xs text-gray-500 mt-0.5">
+          {subtitle}
+        </p>
+
       </div>
     </div>
   );
