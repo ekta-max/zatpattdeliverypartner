@@ -1,12 +1,17 @@
-//src\pages\VerificationPendingPage.jsx
+// src/pages/VerificationPendingPage.jsx
 
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Clock3 } from "lucide-react";
 import { getMyProfileDp } from "../Services/profileDp";
+import { useOnboardingGate } from "../hooks/useOnboardingGate";
 
 export default function VerificationPendingPage() {
   const navigate = useNavigate();
+
+  // Ensures the user hasn't skipped work-details / personal-details / kit.
+  useOnboardingGate("/verification-pending");
+
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {

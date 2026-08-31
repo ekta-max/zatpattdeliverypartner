@@ -317,20 +317,7 @@ export default function OtpPage() {
           ------------------------------------------------- */}
           <div className="md:col-span-7 p-5 sm:p-7 md:p-10 lg:p-12 flex flex-col justify-between bg-white">
             <div>
-              {/* Header Title */}
-              <div className="flex items-center gap-3 mb-3.5 sm:mb-4">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-[#FFF5EC] border border-[#FED7AA] flex items-center justify-center shrink-0 shadow-sm">
-                  <KeyRound size={22} color="#FF6600" />
-                </div>
-                <div>
-                  <span className="text-[10px] sm:text-xs font-extrabold uppercase tracking-[1.5px] text-[#FF6600] block leading-tight">
-                    Partner Verification
-                  </span>
-                  <h2 className="text-[20px] sm:text-[24px] lg:text-[26px] font-black text-[#2E1A0F] leading-tight">
-                    Enter 6-Digit OTP
-                  </h2>
-                </div>
-              </div>
+          
 
               {/* Phone Info Row */}
               <div className="flex items-center justify-between py-2 sm:py-2.5 px-3.5 sm:px-4 rounded-xl sm:rounded-2xl bg-[#FAF6F0] border border-[#F3E7DC] mb-4 sm:mb-5">

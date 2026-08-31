@@ -1,5 +1,3 @@
-// src/Services/redirection.js
-
 import api from "./api";
 
 /**
@@ -10,5 +8,5 @@ export const getPageRedirection = async () => {
   const res = await api.get(
     "/api/v1/common/delivery-partner/page-redirection/"
   );
-  return res.data; // { status: true, data: { page: "select-slot" } }
+  return res.data;
 };
