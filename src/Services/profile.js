@@ -1,11 +1,26 @@
-//src\Services\profile.js
+// src/Services/profile.js
 
 import api from "./api";
 
-
+/**
+ * Get delivery partner's own profile
+ * GET /api/v1/common/delivery-partner/my-profile-dp/
+ */
 export const getProfile = async () => {
   const res = await api.get(
-    "/api/v1/common/delivery-partner/my-profile-dp/",
+    "/api/v1/common/delivery-partner/my-profile-dp/"
+  );
+
+  return res.data;
+};
+
+/**
+ * Get delivery partner course/training content
+ * GET /api/v1/common/delivery-partner/content-data/
+ */
+export const getCourseContent = async () => {
+  const res = await api.get(
+    "/api/v1/common/delivery-partner/content-data/"
   );
 
   return res.data;
@@ -26,7 +41,6 @@ export const updateProfile = async ({
   const res = await api.post(
     "/api/v1/common/delivery-partner/add-or-edit-profile-dp/",
     {
-      user: 10, // ⚠️ make dynamic later
       vehicle_type,
       bank_account_number,
       location_permission,

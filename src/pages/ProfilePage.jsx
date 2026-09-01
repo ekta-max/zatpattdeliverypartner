@@ -28,11 +28,14 @@ import {
   MessageCircle,
   X,
   Upload,
+  PlayCircle,
+  BookOpen,
+  Loader2,
 } from "lucide-react";
 
 import { LanguageContext } from "../context/LanguageContext";
 import { NotificationContext } from "../context/NotificationContext";
-import { API_BASE_URL } from "../Services/api";
+import api, { API_BASE_URL } from "../Services/api";
 
 import { reportBug, updateProfile } from "../Services/profile";
 import { getMyProfileDp } from "../Services/profileDp";
@@ -210,6 +213,17 @@ export default function ProfilePage() {
 
   const [docPreviews, setDocPreviews] = useState({});
 
+  /* =========================================================
+     COURSE / TRAINING
+  ========================================================= */
+
+  const [courseVideos, setCourseVideos] = useState([]);
+  const [loadingCourse, setLoadingCourse] = useState(true);
+  const [courseError, setCourseError] = useState("");
+  const [selectedCourse, setSelectedCourse] = useState(null);
+  const [completedCourseVideos, setCompletedCourseVideos] = useState([]);
+  const [courseExpanded, setCourseExpanded] = useState(false);
+
   const [faqOpen, setFaqOpen] = useState({});
 
   const isEditable =
@@ -348,11 +362,88 @@ export default function ProfilePage() {
     }
   };
 
+  /* =========================================================
+     FETCH COURSE CONTENT
+  ========================================================= */
+
+  const fetchCourseContent = async () => {
+    setLoadingCourse(true);
+    setCourseError("");
+
+    try {
+      const res = await api.get(
+        "/api/v1/common/delivery-partner/content-data/"
+      );
+      const list = Array.isArray(res?.data?.data) ? res.data.data : [];
+
+      const normalized = list
+        .filter((item) => item?.video)
+        .sort((a, b) => Number(a?.order || 0) - Number(b?.order || 0))
+        .map((item, index) => ({
+          id: item.id,
+          title: item.title || `Training Video ${index + 1}`,
+          videoUrl: item.video,
+          order: item.order ?? index + 1,
+        }));
+
+      setCourseVideos(normalized);
+    } catch (err) {
+      console.error("Course content API error ❌", err);
+      setCourseError("Unable to load training videos right now.");
+    } finally {
+      setLoadingCourse(false);
+    }
+  };
+
   useEffect(() => {
     fetchProfile();
+    fetchCourseContent();
+
+    try {
+      const saved = JSON.parse(
+        localStorage.getItem("completed_training_videos") || "[]"
+      );
+
+      if (Array.isArray(saved)) {
+        setCompletedCourseVideos(saved);
+      }
+    } catch (err) {
+      console.warn("Could not read course progress", err);
+    }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const isCourseCompleted = (videoId) =>
+    completedCourseVideos.includes(videoId);
+
+  const completedCourseCount = courseVideos.filter((video) =>
+    completedCourseVideos.includes(video.id)
+  ).length;
+
+  const courseProgress =
+    courseVideos.length > 0
+      ? Math.round((completedCourseCount / courseVideos.length) * 100)
+      : 0;
+
+  const markCourseVideoCompleted = (videoId) => {
+    if (!videoId) return;
+
+    setCompletedCourseVideos((prev) => {
+      if (prev.includes(videoId)) return prev;
+
+      const updated = [...prev, videoId];
+      localStorage.setItem(
+        "completed_training_videos",
+        JSON.stringify(updated)
+      );
+      return updated;
+    });
+  };
+
+  const openCourseVideo = (video) => {
+    setSelectedCourse(video);
+  };
 
   /* =========================================================
      FIELD HELPERS
@@ -1826,6 +1917,203 @@ export default function ProfilePage() {
         </section>
 
         {/* ===================================================
+            TRAINING COURSE
+        =================================================== */}
+
+        <section
+          className="bg-white rounded-[24px] sm:rounded-[32px] border overflow-hidden"
+          style={{
+            borderColor: BORDER,
+            boxShadow: "0 18px 50px rgba(80,40,10,0.06)",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setCourseExpanded((prev) => !prev)}
+            className="w-full text-left p-4 sm:p-6 transition-colors hover:bg-[#FFFBF7]"
+            aria-expanded={courseExpanded}
+          >
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                <div
+                  className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center shrink-0"
+                  style={{
+                    background: SOFT_ORANGE,
+                    border: "1px solid #FFD7B8",
+                    color: BRAND_ORANGE,
+                  }}
+                >
+                  <BookOpen size={20} />
+                </div>
+
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-base sm:text-lg font-black text-[#17110D]">
+                      Training Course
+                    </h2>
+                    {courseVideos.length > 0 && (
+                      <span className="px-2 py-0.5 rounded-full bg-[#FFF2E8] border border-[#FFD7B8] text-[#FF6600] text-[9px] sm:text-[10px] font-black">
+                        {completedCourseCount}/{courseVideos.length}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs sm:text-sm text-[#765F50] mt-0.5">
+                    Review your delivery partner training videos anytime
+                  </p>
+                </div>
+              </div>
+
+              <div
+                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shrink-0 transition-transform duration-300 ${
+                  courseExpanded ? "rotate-180" : "rotate-0"
+                }`}
+                style={{
+                  background: SOFT_ORANGE_2,
+                  border: "1px solid #FFD7B8",
+                  color: BRAND_ORANGE,
+                }}
+              >
+                <ChevronDown size={20} />
+              </div>
+            </div>
+          </button>
+
+          {courseExpanded && (
+            <div className="border-t border-[#E9DED3]">
+              <div className="p-4 sm:p-6">
+                {courseVideos.length > 0 && (
+                  <div className="mb-5">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[10px] font-black text-[#765F50]">
+                        Course Progress
+                      </span>
+                      <span className="text-[10px] font-black text-[#FF6600]">
+                        {courseProgress}%
+                      </span>
+                    </div>
+                    <div className="h-2 rounded-full bg-[#F1E9E2] overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${courseProgress}%`,
+                          background: BRAND_GRADIENT,
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {loadingCourse ? (
+                  <div className="py-8 flex flex-col items-center justify-center text-center">
+                    <Loader2
+                      size={28}
+                      className="text-[#FF6600] animate-spin mb-3"
+                    />
+                    <p className="text-xs sm:text-sm font-black text-[#17110D]">
+                      Loading training videos...
+                    </p>
+                    <p className="text-[10px] sm:text-[11px] text-[#765F50] mt-1">
+                      Please wait a moment
+                    </p>
+                  </div>
+                ) : courseError ? (
+                  <div className="rounded-2xl border border-[#FFD7B8] bg-[#FFF8F2] p-4 text-center">
+                    <p className="text-xs sm:text-sm font-black text-[#17110D]">
+                      {courseError}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={fetchCourseContent}
+                      className="mt-3 px-4 py-2.5 rounded-xl text-white text-xs font-black"
+                      style={{ background: BRAND_GRADIENT }}
+                    >
+                      Try Again
+                    </button>
+                  </div>
+                ) : courseVideos.length === 0 ? (
+                  <div className="rounded-2xl border border-[#E9DED3] bg-[#FAF7F3] p-5 text-center">
+                    <BookOpen size={28} className="mx-auto text-[#FF6600] mb-2" />
+                    <p className="text-xs sm:text-sm font-black text-[#17110D]">
+                      No training videos available
+                    </p>
+                    <p className="text-[10px] sm:text-[11px] text-[#765F50] mt-1">
+                      Training content will appear here when it is published.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {courseVideos.map((video, index) => {
+                      const completed = isCourseCompleted(video.id);
+
+                      return (
+                        <div
+                          key={video.id ?? `${video.order}-${index}`}
+                          className={`rounded-2xl border p-3 sm:p-4 transition-all ${
+                            completed
+                              ? "bg-[#F5FBF6] border-[#CFE7D3]"
+                              : "bg-[#FFF8F2] border-[#FFE3CF] hover:shadow-md"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 sm:gap-4">
+                            <div
+                              className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center shrink-0 text-white"
+                              style={{ background: HERO_GRADIENT }}
+                            >
+                              {completed ? (
+                                <CheckCircle2 size={20} />
+                              ) : (
+                                <PlayCircle size={21} />
+                              )}
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-[#FF6600]">
+                                  Lesson {index + 1}
+                                </span>
+
+                                {completed && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-50 border border-green-200 text-green-700 text-[9px] font-black">
+                                    <CheckCircle2 size={10} />
+                                    Completed
+                                  </span>
+                                )}
+                              </div>
+
+                              <h3 className="text-xs sm:text-sm font-black text-[#17110D] mt-1 truncate">
+                                {video.title}
+                              </h3>
+
+                              <p className="text-[10px] sm:text-[11px] text-[#765F50] mt-0.5">
+                                Watch this lesson to review the training material.
+                              </p>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => openCourseVideo(video)}
+                              className="shrink-0 inline-flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2.5 rounded-xl text-white text-[10px] sm:text-xs font-black transition active:scale-95"
+                              style={{
+                                background: BRAND_GRADIENT,
+                                boxShadow: "0 6px 16px rgba(255,102,0,0.18)",
+                              }}
+                            >
+                              <PlayCircle size={13} />
+                              <span>{completed ? "Review" : "Watch"}</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </section>
+
+
+        {/* ===================================================
             SETTINGS
         =================================================== */}
 
@@ -2273,6 +2561,108 @@ export default function ProfilePage() {
           </div>
         </div>
       </main>
+
+      {/* =====================================================
+          COURSE VIDEO MODAL
+      ===================================================== */}
+
+      {selectedCourse && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-3 sm:p-4">
+          <div className="bg-white rounded-[24px] sm:rounded-[32px] w-full max-w-3xl max-h-[94vh] overflow-hidden shadow-2xl border border-[#E9DED3] flex flex-col">
+            <div
+              className="text-white p-4 sm:p-5 flex items-center justify-between gap-3 shrink-0"
+              style={{ background: HERO_GRADIENT }}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center shrink-0">
+                  <PlayCircle size={19} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[9px] font-black uppercase tracking-wider text-white/80">
+                    Training Lesson
+                  </p>
+                  <h3 className="font-black text-sm sm:text-base truncate">
+                    {selectedCourse.title}
+                  </h3>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedCourse(null)}
+                className="w-9 h-9 rounded-xl bg-white/15 hover:bg-white/25 flex items-center justify-center transition shrink-0"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-3 sm:p-5 overflow-y-auto">
+              <div className="rounded-2xl overflow-hidden bg-black border border-[#E9DED3] aspect-video flex items-center justify-center">
+                <video
+                  key={selectedCourse.videoUrl}
+                  src={selectedCourse.videoUrl}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="w-full h-full object-contain"
+                >
+                  Your browser does not support the video tag.
+                </video>
+              </div>
+
+              <div className="mt-4 rounded-2xl bg-[#FFF8F2] border border-[#FFE3CF] p-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-white border border-[#FFD7B8] flex items-center justify-center text-[#FF6600] shrink-0">
+                    <BookOpen size={16} />
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="text-xs sm:text-sm font-black text-[#17110D]">
+                      Review this lesson
+                    </h4>
+                    <p className="text-[10px] sm:text-[11px] text-[#765F50] mt-1 leading-relaxed">
+                      You can watch this training video again whenever you need a refresher.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  markCourseVideoCompleted(selectedCourse.id);
+                  addNotification?.("Training lesson marked as completed ✅");
+                }}
+                disabled={isCourseCompleted(selectedCourse.id)}
+                className={`mt-4 w-full min-h-[50px] rounded-2xl text-xs sm:text-sm font-black flex items-center justify-center gap-2 transition ${
+                  isCourseCompleted(selectedCourse.id)
+                    ? "bg-[#EAF5EC] text-green-700 border border-green-200 cursor-default"
+                    : "text-white active:scale-[0.99]"
+                }`}
+                style={
+                  !isCourseCompleted(selectedCourse.id)
+                    ? {
+                        background: BRAND_GRADIENT,
+                        boxShadow: "0 8px 20px rgba(255,102,0,0.22)",
+                      }
+                    : undefined
+                }
+              >
+                {isCourseCompleted(selectedCourse.id) ? (
+                  <>
+                    <CheckCircle2 size={16} />
+                    Lesson Completed
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={16} />
+                    Mark as Completed
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* =====================================================
           SUPPORT CHAT MODAL
