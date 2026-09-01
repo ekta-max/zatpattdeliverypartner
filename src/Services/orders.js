@@ -4,17 +4,19 @@ import api from "./api";
 
 /**
  * CASE TRACKING API
+ *
  * Tabs:
  * new
  * accepted
  * picked-up
  * delivered
+ *
+ * User is taken from request.user in the backend.
  */
 export const getOrdersByStatus = async (status = "new") => {
   const res = await api.post(
     "/api/v1/common/delivery-partner/case-tracking/",
     {
-      user: 10, // ⚠️ make dynamic later
       status,
     }
   );
@@ -24,12 +26,13 @@ export const getOrdersByStatus = async (status = "new") => {
 
 /**
  * ACCEPT ORDER
+ *
+ * Backend gets logged-in user from request.user
  */
 export const acceptOrderApi = async (orderId) => {
   const res = await api.post(
     "/api/v1/common/delivery-partner/accept-order/",
     {
-      user: 10,
       order_id: orderId,
     }
   );
@@ -39,12 +42,13 @@ export const acceptOrderApi = async (orderId) => {
 
 /**
  * MARK PICKED UP
+ *
+ * Backend gets logged-in user from request.user
  */
 export const markPickedUpApi = async (orderId) => {
   const res = await api.post(
     "/api/v1/common/delivery-partner/mark-picked-up/",
     {
-      user: 10,
       order_id: orderId,
     }
   );
@@ -54,7 +58,10 @@ export const markPickedUpApi = async (orderId) => {
 
 /**
  * VERIFY DELIVERY OTP
+ *
  * POST /otp-match/
+ *
+ * Backend gets logged-in user from request.user
  */
 export const verifyDeliveryOtpApi = async ({
   orderId,
@@ -63,7 +70,6 @@ export const verifyDeliveryOtpApi = async ({
   const res = await api.post(
     "/api/v1/common/delivery-partner/otp-match/",
     {
-      user: 10,
       order_id: orderId,
       otp,
     }
@@ -74,12 +80,13 @@ export const verifyDeliveryOtpApi = async ({
 
 /**
  * MARK DELIVERED
+ *
+ * Backend gets logged-in user from request.user
  */
 export const markDeliveredApi = async (orderId) => {
   const res = await api.post(
     "/api/v1/common/delivery-partner/mark-delivered/",
     {
-      user: 10,
       order_id: orderId,
     }
   );
@@ -89,7 +96,10 @@ export const markDeliveredApi = async (orderId) => {
 
 /**
  * COLLECT PAYMENT (COD)
+ *
  * POST /collect-payment/
+ *
+ * Backend gets logged-in user from request.user
  */
 export const collectPaymentApi = async (orderId) => {
   const res = await api.post(

@@ -1,60 +1,52 @@
 // src/Services/dpService.js
 
-const DP_DATA_URL = "http://127.0.0.1:8002/api/v1/common/delivery-partner/dp-data/";
-
-/**
- * Retrieves the stored auth token
- */
-export const getAuthToken = () => {
-  return (
-    localStorage.getItem("access_token") ||
-    localStorage.getItem("accessToken") ||
-    localStorage.getItem("access") ||
-    localStorage.getItem("token")
-  );
-};
+import api from "./api";
 
 /**
  * Fetch delivery partner data from Django API
+ *
+ * The base URL and Authorization token are handled
+ * automatically by src/Services/api.js
  */
 export const fetchDpData = async () => {
   try {
-    const token = getAuthToken();
-    const headers = {
-      "Content-Type": "application/json",
-    };
+    const response = await api.get(
+      "/api/v1/common/delivery-partner/dp-data/"
+    );
 
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
+    console.log("DP data response:", response.data);
 
-    const response = await fetch(DP_DATA_URL, {
-      method: "GET",
-      headers,
-      credentials: "include",
-    });
+    if (
+      response.data?.status === true &&
+      response.data?.data
+    ) {
+      const data = response.data.data;
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`dp-data API failed (${response.status}):`, errorText);
-      throw new Error(`API error ${response.status}`);
-    }
+      // Sync API data with localStorage
+      syncDpDataToStorage(data);
 
-    const result = await response.json();
-    if (result.status === true && result.data) {
-      syncDpDataToStorage(result.data);
-      return result.data;
+      return data;
     }
 
     return null;
   } catch (error) {
-    console.error("Failed to fetch dp-data:", error);
+    console.error(
+      "Failed to fetch dp-data:",
+      error
+    );
+
+    console.error(
+      "DP API response:",
+      error?.response?.data
+    );
+
     return null;
   }
 };
 
 /**
- * Evaluates completion criteria for all onboarding & verification steps
+ * Evaluates completion criteria for all
+ * onboarding & verification steps
  */
 export const evaluateDpProgress = (data) => {
   if (!data) {
@@ -68,36 +60,71 @@ export const evaluateDpProgress = (data) => {
     };
   }
 
-  // Step 1: Requires both city AND vehicle_type
+  // =========================================================
+  // STEP 1
+  // Requires city AND vehicle_type
+  // =========================================================
+
   const step1Done = Boolean(
-    data.city && String(data.city).trim() !== "" &&
-    data.vehicle_type && String(data.vehicle_type).trim() !== ""
+    data.city &&
+      String(data.city).trim() !== "" &&
+      data.vehicle_type &&
+      String(data.vehicle_type).trim() !== ""
   );
 
-  // Step 2: Requires Aadhaar, PAN, Bank account, and Selfie
+  // =========================================================
+  // STEP 2
+  // Requires Aadhaar, PAN, Bank Account & Selfie
+  // =========================================================
+
   const step2Done = Boolean(
-    data.adhaar_card_number && String(data.adhaar_card_number).trim() !== "" &&
-    data.pan_card_number && String(data.pan_card_number).trim() !== "" &&
-    data.bank_account_number && String(data.bank_account_number).trim() !== "" &&
-    data.selfie && String(data.selfie).trim() !== ""
+    data.adhaar_card_number &&
+      String(data.adhaar_card_number).trim() !== "" &&
+      data.pan_card_number &&
+      String(data.pan_card_number).trim() !== "" &&
+      data.bank_account_number &&
+      String(data.bank_account_number).trim() !== "" &&
+      data.selfie &&
+      String(data.selfie).trim() !== ""
   );
 
-  // Step 3: Requires T-shirt size
+  // =========================================================
+  // STEP 3
+  // Requires T-shirt size
+  // =========================================================
+
   const step3Done = Boolean(
-    data.tshirt_size && String(data.tshirt_size).trim() !== ""
+    data.tshirt_size &&
+      String(data.tshirt_size).trim() !== ""
   );
 
-  // Verification
+  // =========================================================
+  // VERIFICATION
+  // =========================================================
+
   const isVerified = Boolean(data.is_verified);
 
-  // Training Completion (Checks training_data modules or local flag)
+  // =========================================================
+  // TRAINING COMPLETION
+  // =========================================================
+
   const trainingDone = Boolean(
-    (data.training_data && data.training_data.first && data.training_data.second && data.training_data.third) ||
-    localStorage.getItem("training_completed") === "true"
+    (
+      data.training_data &&
+      data.training_data.first &&
+      data.training_data.second &&
+      data.training_data.third
+    ) ||
+      localStorage.getItem("training_completed") ===
+        "true"
   );
 
-  // Determine the next appropriate route in the funnel
+  // =========================================================
+  // DETERMINE NEXT ROUTE
+  // =========================================================
+
   let nextRoute = "/work-details";
+
   if (!step1Done) {
     nextRoute = "/work-details";
   } else if (!step2Done) {
@@ -128,14 +155,45 @@ export const evaluateDpProgress = (data) => {
 export const syncDpDataToStorage = (data) => {
   if (!data) return;
 
+  // =========================================================
+  // ONBOARDING PROGRESS
+  // =========================================================
+
   const progress = {
-    work_details: (data.city && data.vehicle_type) ? "completed" : "pending",
-    personal_details: (data.adhaar_card_number && data.pan_card_number) ? "completed" : "pending",
+    work_details:
+      data.city && data.vehicle_type
+        ? "completed"
+        : "pending",
+
+    personal_details:
+      data.adhaar_card_number &&
+      data.pan_card_number
+        ? "completed"
+        : "pending",
+
     kit_ordered: Boolean(data.tshirt_size),
   };
 
-  localStorage.setItem("onboarding_progress", JSON.stringify(progress));
-  localStorage.setItem("verification_status", data.is_verified ? "verified" : "pending");
+  localStorage.setItem(
+    "onboarding_progress",
+    JSON.stringify(progress)
+  );
+
+  // =========================================================
+  // VERIFICATION STATUS
+  // =========================================================
+
+  localStorage.setItem(
+    "verification_status",
+    data.is_verified
+      ? "verified"
+      : "pending"
+  );
+
+  // =========================================================
+  // PERSONAL DETAILS
+  // =========================================================
+
   localStorage.setItem(
     "personal_details",
     JSON.stringify({
@@ -144,12 +202,24 @@ export const syncDpDataToStorage = (data) => {
       email: data.email || "",
       gender: data.gender || "",
       dob: data.dob || "",
-      aadhaar: data.adhaar_card_number || "",
-      pan: data.pan_card_number || "",
-      vehicleNumber: data.vehicle_number || "",
-      bank: data.account_holder_name || "",
-      account: data.bank_account_number || "",
-      ifsc: data.ifsc_code || "",
+
+      aadhaar:
+        data.adhaar_card_number || "",
+
+      pan:
+        data.pan_card_number || "",
+
+      vehicleNumber:
+        data.vehicle_number || "",
+
+      bank:
+        data.account_holder_name || "",
+
+      account:
+        data.bank_account_number || "",
+
+      ifsc:
+        data.ifsc_code || "",
     })
   );
 };

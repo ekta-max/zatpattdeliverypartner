@@ -1,4 +1,5 @@
 // src/Services/api.js
+
 import axios from "axios";
 
 export const API_BASE_URL =
@@ -17,8 +18,8 @@ api.interceptors.request.use(
     const accessToken = localStorage.getItem("access_token");
 
     const isAuthApi =
-      config.url.includes("request-otp") ||
-      config.url.includes("verify-otp");
+      config.url?.includes("request-otp") ||
+      config.url?.includes("verify-otp");
 
     if (accessToken && !isAuthApi) {
       config.headers.Authorization = `Bearer ${accessToken}`;
@@ -36,12 +37,13 @@ api.interceptors.response.use(
       console.warn("Token expired");
 
       const isLoginRequest =
-        error.config.url.includes("request-otp") ||
-        error.config.url.includes("verify-otp");
+        error.config?.url?.includes("request-otp") ||
+        error.config?.url?.includes("verify-otp");
 
       if (!isLoginRequest) {
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+
         window.location.href = "/";
       }
     }

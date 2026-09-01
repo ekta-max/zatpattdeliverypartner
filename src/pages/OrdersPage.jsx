@@ -285,7 +285,7 @@ export default function OrdersPage() {
             </div>
 
             <h1 className="text-sm sm:text-lg font-black mt-1 truncate">
-              Orders
+              Delivery Orders
             </h1>
           </div>
 

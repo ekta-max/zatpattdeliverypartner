@@ -1,742 +1,875 @@
 // src/pages/TrainingCoursePage.jsx
 
-import React, { useEffect, useState } from "react";
-import {
-  Lock,
-  PlayCircle,
-  CheckCircle,
-  ArrowRight,
-} from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import {
-  fetchDpData,
-  evaluateDpProgress,
-} from "../Services/dpService";
+import React, {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
-const LESSONS = [
-  {
-    id: 1,
-    key: "first",
-    title: "Introduction to Zatpatt",
-    duration: "1 min",
-  },
-  {
-    id: 2,
-    key: "second",
-    title: "How to deliver orders",
-    duration: "3 min",
-  },
-  {
-    id: 3,
-    key: "third",
-    title: "Payments & Earnings",
-    duration: "2 min",
-  },
-];
+import { useNavigate } from "react-router-dom";
+
+import {
+  ArrowLeft,
+  Play,
+  CheckCircle,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  AlertCircle,
+} from "lucide-react";
+
+import api from "../Services/api";
 
 export default function TrainingCoursePage() {
   const navigate = useNavigate();
 
-  const [progressCount, setProgressCount] = useState(0);
+  // --------------------------------------------------
+  // STATES
+  // --------------------------------------------------
+
+  const [videos, setVideos] = useState([]);
+  const [currentVideo, setCurrentVideo] = useState(0);
+
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  // =========================================================
-  // LOAD TRAINING PROGRESS
-  // =========================================================
+  const [completedVideos, setCompletedVideos] = useState([]);
 
-  useEffect(() => {
-    const checkProgress = async () => {
+  // Prevent React StrictMode duplicate API call
+  const hasFetched = useRef(false);
+
+  // --------------------------------------------------
+  // API
+  // --------------------------------------------------
+
+  const CONTENT_API =
+    "/api/v1/common/delivery-partner/content-data/";
+
+  // --------------------------------------------------
+  // FETCH TRAINING CONTENT
+  // --------------------------------------------------
+
+  const fetchVideos = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      console.log("Fetching training content...");
+
+      const response = await api.get(CONTENT_API);
+
+      console.log(
+        "Training content response:",
+        response.data
+      );
+
+      if (
+        response.data?.status !== true ||
+        !Array.isArray(response.data?.data)
+      ) {
+        throw new Error(
+          response.data?.message ||
+            "Training videos could not be loaded."
+        );
+      }
+
+      // --------------------------------------------------
+      // SORT BY ORDER
+      // --------------------------------------------------
+
+      const sortedVideos = [
+        ...response.data.data,
+      ]
+        .sort(
+          (a, b) =>
+            Number(a.order) - Number(b.order)
+        )
+        .map((video) => ({
+          id: Number(video.id),
+          title:
+            video.title ||
+            `Video ${video.order}`,
+          video: video.video,
+          order: Number(video.order),
+        }));
+
+      console.log(
+        "Training videos:",
+        sortedVideos
+      );
+
+      setVideos(sortedVideos);
+
+      // First video
+      setCurrentVideo(0);
+
+      // --------------------------------------------------
+      // LOAD LOCAL PROGRESS
+      // --------------------------------------------------
+
       try {
-        setLoading(true);
-
-        const data = await fetchDpData();
-
-        // =====================================================
-        // NO DATA
-        // =====================================================
-
-        if (!data) {
-          navigate("/onboarding-steps", {
-            replace: true,
-          });
-          return;
-        }
-
-        const evaluated = evaluateDpProgress(data);
-
-        // =====================================================
-        // VERIFICATION CHECK
-        // =====================================================
-
-        if (!evaluated.isVerified) {
-          navigate("/verification-pending", {
-            replace: true,
-          });
-          return;
-        }
-
-        // =====================================================
-        // CALCULATE COMPLETED LESSONS
-        // =====================================================
-
-        let apiProgress = 0;
-
-        const trainingData = data?.training_data;
-
-        if (trainingData) {
-          /*
-           * We check each lesson individually.
-           *
-           * first  -> lesson 1
-           * second -> lesson 2
-           * third  -> lesson 3
-           */
-
-          const firstCompleted =
-            trainingData.first === true ||
-            trainingData.first === "true" ||
-            trainingData.first === "completed" ||
-            trainingData.first === 1 ||
-            trainingData.first === "1";
-
-          const secondCompleted =
-            trainingData.second === true ||
-            trainingData.second === "true" ||
-            trainingData.second === "completed" ||
-            trainingData.second === 1 ||
-            trainingData.second === "1";
-
-          const thirdCompleted =
-            trainingData.third === true ||
-            trainingData.third === "true" ||
-            trainingData.third === "completed" ||
-            trainingData.third === 1 ||
-            trainingData.third === "1";
-
-          // ---------------------------------------------------
-          // Sequential progress
-          // ---------------------------------------------------
-
-          if (firstCompleted) {
-            apiProgress = 1;
-          }
-
-          if (secondCompleted) {
-            apiProgress = 2;
-          }
-
-          if (thirdCompleted) {
-            apiProgress = 3;
-          }
-        }
-
-        // =====================================================
-        // LOCAL STORAGE PROGRESS
-        // =====================================================
-
-        const localProgress = Number(
-          localStorage.getItem("training_progress") || 0
-        );
-
-        /*
-         * Use whichever progress is higher.
-         *
-         * This is useful if:
-         * - video completion was saved locally
-         * - API data hasn't refreshed yet
-         */
-
-        const finalProgress = Math.max(
-          apiProgress,
-          localProgress
-        );
-
-        // =====================================================
-        // ALL TRAINING COMPLETED
-        // =====================================================
-
-        if (finalProgress >= LESSONS.length) {
-          localStorage.setItem(
-            "training_progress",
-            String(LESSONS.length)
+        const saved =
+          localStorage.getItem(
+            "completed_training_videos"
           );
 
-          navigate("/training-completed", {
-            replace: true,
-          });
+        if (saved) {
+          const parsed = JSON.parse(saved);
 
-          return;
+          if (Array.isArray(parsed)) {
+            setCompletedVideos(parsed);
+          }
         }
-
-        // =====================================================
-        // SAVE CURRENT PROGRESS
-        // =====================================================
-
-        localStorage.setItem(
-          "training_progress",
-          String(finalProgress)
+      } catch (storageError) {
+        console.warn(
+          "Unable to load training progress:",
+          storageError
         );
-
-        setProgressCount(finalProgress);
-      } catch (error) {
-        console.error(
-          "Failed to load training progress:",
-          error
-        );
-      } finally {
-        setLoading(false);
       }
-    };
+    } catch (err) {
+      console.error(
+        "Training content API error:",
+        err
+      );
 
-    checkProgress();
-  }, [navigate]);
+      console.error(
+        "API response:",
+        err?.response?.data
+      );
 
-  // =========================================================
-  // COMPLETION %
-  // =========================================================
+      setError(
+        err?.response?.data?.message ||
+          err?.response?.data?.detail ||
+          err?.message ||
+          "Unable to load training videos."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const completionPercent = Math.round(
-    (progressCount / LESSONS.length) * 100
-  );
+  // --------------------------------------------------
+  // INITIAL LOAD
+  // --------------------------------------------------
 
-  // =========================================================
-  // LESSON CLICK
-  // =========================================================
-
-  const handleLessonClick = (index) => {
-    /*
-     * Only the next lesson is clickable.
-     *
-     * progressCount = 0
-     * ----------------
-     * Lesson 1 -> clickable
-     * Lesson 2 -> locked
-     * Lesson 3 -> locked
-     *
-     * progressCount = 1
-     * ----------------
-     * Lesson 1 -> completed
-     * Lesson 2 -> clickable
-     * Lesson 3 -> locked
-     *
-     * progressCount = 2
-     * ----------------
-     * Lesson 1 -> completed
-     * Lesson 2 -> completed
-     * Lesson 3 -> clickable
-     */
-
-    if (index !== progressCount) {
+  useEffect(() => {
+    if (hasFetched.current) {
       return;
     }
 
-    navigate(
-      `/training/video/${LESSONS[index].id}`
+    hasFetched.current = true;
+
+    fetchVideos();
+  }, []);
+
+  // --------------------------------------------------
+  // MARK VIDEO COMPLETED
+  // --------------------------------------------------
+
+  const markVideoCompleted = (videoId) => {
+    if (!videoId) return;
+
+    setCompletedVideos((previous) => {
+      // Already completed
+      if (previous.includes(videoId)) {
+        return previous;
+      }
+
+      const updated = [
+        ...previous,
+        videoId,
+      ];
+
+      localStorage.setItem(
+        "completed_training_videos",
+        JSON.stringify(updated)
+      );
+
+      return updated;
+    });
+  };
+
+  // --------------------------------------------------
+  // VIDEO ENDED
+  // --------------------------------------------------
+
+  const handleVideoEnded = () => {
+    const video = videos[currentVideo];
+
+    if (!video) return;
+
+    console.log(
+      "Video reached end:",
+      video.title
+    );
+
+    // Do NOT automatically mark completed.
+    // User must click "Mark as Completed".
+  };
+
+  // --------------------------------------------------
+  // MANUAL MARK COMPLETED
+  // --------------------------------------------------
+
+  const handleMarkCompleted = () => {
+    const video = videos[currentVideo];
+
+    if (!video) return;
+
+    console.log(
+      "Marking video completed:",
+      video.title
+    );
+
+    markVideoCompleted(video.id);
+  };
+
+  // --------------------------------------------------
+  // VIDEO ERROR
+  // --------------------------------------------------
+
+  const handleVideoError = (event) => {
+    const video = videos[currentVideo];
+
+    console.error(
+      "Video failed to load ❌"
+    );
+
+    console.error(
+      "Video URL:",
+      video?.video
+    );
+
+    console.error(
+      "Video element:",
+      event.currentTarget
     );
   };
 
-  // =========================================================
+  // --------------------------------------------------
+  // PREVIOUS VIDEO
+  // --------------------------------------------------
+
+  const handlePrevious = () => {
+    if (currentVideo > 0) {
+      setCurrentVideo(
+        (previous) => previous - 1
+      );
+    }
+  };
+
+  // --------------------------------------------------
+  // NEXT VIDEO
+  // --------------------------------------------------
+
+  const handleNext = () => {
+    if (
+      currentVideo <
+      videos.length - 1
+    ) {
+      setCurrentVideo(
+        (previous) => previous + 1
+      );
+    }
+  };
+
+  // --------------------------------------------------
+  // COMPLETE TRAINING
+  // --------------------------------------------------
+
+  const handleCompleteTraining = () => {
+    localStorage.setItem(
+      "training_completed",
+      "true"
+    );
+
+    navigate("/training-completed");
+  };
+
+  // --------------------------------------------------
+  // RETRY
+  // --------------------------------------------------
+
+  const handleRetry = () => {
+    hasFetched.current = false;
+    fetchVideos();
+  };
+
+  // --------------------------------------------------
   // LOADING
-  // =========================================================
+  // --------------------------------------------------
 
   if (loading) {
     return (
       <div
-        className="
-          h-dvh
-          w-full
-          overflow-hidden
-          flex
-          items-center
-          justify-center
-          bg-[#FAF6F0]
-          px-4
-        "
+        className="min-h-screen flex items-center justify-center px-4"
+        style={{
+          backgroundColor: "#FAF6F0",
+        }}
       >
-        <div className="flex items-center gap-2">
-          <div
-            className="
-              w-5
-              h-5
-              rounded-full
-              border-2
-              border-[#FF6600]
-              border-t-transparent
-              animate-spin
-            "
+        <div className="bg-white rounded-3xl border border-[#F3E7DC] shadow-[0_20px_60px_rgba(100,50,15,0.08)] px-8 py-8 text-center">
+
+          <Loader2
+            size={34}
+            className="mx-auto mb-4 text-[#FF6600] animate-spin"
           />
 
-          <span
-            className="
-              text-sm
-              font-bold
-              text-[#FF6600]
-            "
-          >
-            Loading training modules...
-          </span>
+          <p className="font-bold text-[#2E1A0F]">
+            Loading training videos...
+          </p>
+
+          <p className="text-xs text-[#7C6657] mt-1">
+            Please wait
+          </p>
+
         </div>
       </div>
     );
   }
 
-  // =========================================================
-  // MAIN PAGE
-  // =========================================================
+  // --------------------------------------------------
+  // ERROR / NO VIDEOS
+  // --------------------------------------------------
+
+  if (
+    error ||
+    videos.length === 0
+  ) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center px-4"
+        style={{
+          backgroundColor: "#FAF6F0",
+          backgroundImage: `
+            radial-gradient(
+              circle at 10% 15%,
+              rgba(255, 230, 205, 0.7) 0%,
+              transparent 40%
+            ),
+            radial-gradient(
+              circle at 92% 25%,
+              rgba(255, 226, 195, 0.75) 0%,
+              transparent 38%
+            )
+          `,
+        }}
+      >
+
+        <div className="bg-white w-full max-w-md rounded-3xl border border-[#F3E7DC] shadow-[0_20px_60px_rgba(100,50,15,0.08)] p-7 sm:p-8 text-center">
+
+          <div className="w-16 h-16 mx-auto rounded-full bg-[#FFF5EC] border border-[#FED7AA] flex items-center justify-center mb-5">
+
+            <AlertCircle
+              size={30}
+              className="text-[#FF6600]"
+            />
+
+          </div>
+
+          <h2 className="text-xl font-black text-[#2E1A0F]">
+            Training Videos Unavailable
+          </h2>
+
+          <p className="text-sm text-[#7C6657] mt-2">
+            {error ||
+              "No training videos were found."}
+          </p>
+
+          <button
+            type="button"
+            onClick={handleRetry}
+            className="w-full mt-6 py-3 rounded-xl text-white font-bold shadow-md"
+            style={{
+              background:
+                "linear-gradient(90deg, #FF6200 0%, #FFA800 100%)",
+            }}
+          >
+            Try Again
+          </button>
+
+        </div>
+
+      </div>
+    );
+  }
+
+  // --------------------------------------------------
+  // CURRENT VIDEO
+  // --------------------------------------------------
+
+  const currentVideoData =
+    videos[currentVideo];
+
+  const isCurrentVideoCompleted =
+    completedVideos.includes(
+      currentVideoData.id
+    );
+
+  // --------------------------------------------------
+  // COMPLETED COUNT
+  // --------------------------------------------------
+
+  const completedCount =
+    videos.filter((video) =>
+      completedVideos.includes(video.id)
+    ).length;
+
+  const allVideosCompleted =
+    videos.length > 0 &&
+    completedCount === videos.length;
+
+  const progressPercentage =
+    videos.length > 0
+      ? (completedCount / videos.length) *
+        100
+      : 0;
+
+  // --------------------------------------------------
+  // MAIN
+  // --------------------------------------------------
 
   return (
     <div
-      className="
-        h-dvh
-        w-full
-        overflow-hidden
-        bg-[#FAF6F0]
-        px-3
-        py-3
-        sm:px-5
-        sm:py-5
-        md:px-8
-        md:py-6
-      "
+      className="min-h-screen w-full pb-8"
       style={{
+        backgroundColor: "#FAF6F0",
         backgroundImage: `
           radial-gradient(
-            circle at 8% 10%,
+            circle at 10% 15%,
             rgba(255, 230, 205, 0.7) 0%,
-            transparent 38%
+            transparent 40%
           ),
           radial-gradient(
-            circle at 95% 20%,
+            circle at 92% 25%,
             rgba(255, 226, 195, 0.75) 0%,
             transparent 38%
           )
         `,
       }}
     >
-      {/* =====================================================
-          PAGE CONTAINER
-      ===================================================== */}
 
-      <div
-        className="
-          h-full
-          w-full
-          max-w-[760px]
-          mx-auto
-          flex
-          flex-col
-        "
-      >
-        {/* ===================================================
-            HEADER
-        =================================================== */}
+      {/* ==================================================
+          HEADER
+      ================================================== */}
 
-        <div
-          className="
-            shrink-0
-            rounded-t-[24px]
-            sm:rounded-t-[28px]
-            md:rounded-t-[30px]
-            px-5
-            py-5
-            sm:px-7
-            sm:py-6
-            md:px-8
-            md:py-7
-            text-white
-            relative
-            overflow-hidden
-          "
-          style={{
-            background:
-              "linear-gradient(155deg, #FF6000 0%, #FF7800 48%, #FFA800 100%)",
-          }}
-        >
-          {/* Brand */}
+      <header className="bg-white border-b border-[#F3E7DC] shadow-sm sticky top-0 z-30">
 
-          <div
-            className="
-              inline-flex
-              items-center
-              gap-2
-              px-3
-              py-1.5
-              rounded-full
-              bg-white/20
-              border
-              border-white/25
-            "
-          >
-            <span
-              className="
-                w-2
-                h-2
-                rounded-full
-                bg-white
-              "
-            />
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4">
 
-            <span
-              className="
-                text-[9px]
-                sm:text-[10px]
-                font-black
-                tracking-[1.5px]
-              "
-            >
-              ZATPATT
-            </span>
-          </div>
+          <div className="flex items-center">
 
-          {/* Title */}
-
-          <h1
-            className="
-              mt-3
-              text-[22px]
-              sm:text-[27px]
-              md:text-[30px]
-              font-black
-              leading-tight
-            "
-          >
-            Training Modules
-          </h1>
-
-          {/* Subtitle */}
-
-          <p
-            className="
-              mt-1
-              text-xs
-              sm:text-sm
-              text-white/90
-            "
-          >
-            Complete each lesson to start delivering.
-          </p>
-        </div>
-
-        {/* ===================================================
-            CONTENT CARD
-        =================================================== */}
-
-        <div
-          className="
-            flex-1
-            min-h-0
-            bg-white
-            rounded-b-[24px]
-            sm:rounded-b-[28px]
-            md:rounded-b-[30px]
-            border
-            border-t-0
-            border-[#F3E7DC]
-            shadow-[0_20px_60px_rgba(100,50,15,0.08)]
-            px-4
-            py-5
-            sm:px-7
-            sm:py-6
-            md:px-8
-            md:py-7
-            flex
-            flex-col
-          "
-        >
-          {/* =================================================
-              PROGRESS HEADER
-          ================================================= */}
-
-          <div className="shrink-0">
-            <div
-              className="
-                flex
-                items-center
-                justify-between
-                mb-2
-              "
-            >
-              <p
-                className="
-                  text-xs
-                  sm:text-sm
-                  font-bold
-                  text-[#2E1A0F]
-                "
-              >
-                Your Progress
-              </p>
-
-              <p
-                className="
-                  text-xs
-                  sm:text-sm
-                  font-black
-                  text-[#FF6600]
-                "
-              >
-                {completionPercent}%
-              </p>
-            </div>
-
-            {/* Progress bar */}
-
-            <div
-              className="
-                h-2
-                bg-[#F1E8E1]
-                rounded-full
-                overflow-hidden
-              "
-            >
-              <div
-                className="
-                  h-full
-                  rounded-full
-                  transition-all
-                  duration-500
-                "
-                style={{
-                  width: `${completionPercent}%`,
-                  background:
-                    "linear-gradient(90deg, #FF6200 0%, #FFA800 100%)",
-                }}
-              />
-            </div>
-          </div>
-
-          {/* =================================================
-              LESSON LIST
-          ================================================= */}
-
-          <div
-            className="
-              flex-1
-              min-h-0
-              flex
-              flex-col
-              justify-center
-              gap-2.5
-              sm:gap-3
-              mt-5
-            "
-          >
-            {LESSONS.map((lesson, index) => {
-              const isCompleted =
-                index < progressCount;
-
-              const isActive =
-                index === progressCount;
-
-              const isLocked =
-                index > progressCount;
-
-              return (
-                <button
-                  key={lesson.id}
-                  type="button"
-                  disabled={!isActive}
-                  onClick={() =>
-                    handleLessonClick(index)
-                  }
-                  className={`
-                    w-full
-                    flex
-                    items-center
-                    gap-3
-                    sm:gap-4
-                    p-3
-                    sm:p-4
-                    rounded-2xl
-                    border
-                    text-left
-                    transition-all
-                    duration-200
-                    ${
-                      isActive
-                        ? "bg-[#FFF9F3] border-[#FFB36B] shadow-sm"
-                        : isCompleted
-                        ? "bg-[#F2FFF7] border-[#C8F3DA]"
-                        : "bg-[#FAF8F5] border-[#E5E7EB] opacity-60"
-                    }
-                  `}
-                >
-                  {/* =================================================
-                      ICON
-                  ================================================= */}
-
-                  <div
-                    className={`
-                      w-10
-                      h-10
-                      sm:w-11
-                      sm:h-11
-                      rounded-xl
-                      flex
-                      items-center
-                      justify-center
-                      shrink-0
-                      ${
-                        isCompleted
-                          ? "bg-[#DCFCE7]"
-                          : isActive
-                          ? "bg-[#FFF0DE]"
-                          : "bg-[#EEEEEE]"
-                      }
-                    `}
-                  >
-                    {isCompleted ? (
-                      <CheckCircle
-                        size={21}
-                        className="text-[#18B957]"
-                        strokeWidth={2.5}
-                      />
-                    ) : isActive ? (
-                      <PlayCircle
-                        size={22}
-                        className="text-[#FF6600]"
-                        strokeWidth={2}
-                      />
-                    ) : (
-                      <Lock
-                        size={18}
-                        className="text-[#9CA3AF]"
-                      />
-                    )}
-                  </div>
-
-                  {/* =================================================
-                      LESSON INFO
-                  ================================================= */}
-
-                  <div className="flex-1 min-w-0">
-                    <p
-                      className="
-                        text-[13px]
-                        sm:text-sm
-                        font-black
-                        text-[#2E1A0F]
-                      "
-                    >
-                      {lesson.title}
-                    </p>
-
-                    <p
-                      className="
-                        text-[10px]
-                        sm:text-xs
-                        text-[#7C6657]
-                        mt-0.5
-                      "
-                    >
-                      {lesson.duration}
-                    </p>
-                  </div>
-
-                  {/* =================================================
-                      STATUS
-                  ================================================= */}
-
-                  {isCompleted && (
-                    <span
-                      className="
-                        text-[9px]
-                        sm:text-[10px]
-                        font-black
-                        text-[#18B957]
-                        uppercase
-                      "
-                    >
-                      Done
-                    </span>
-                  )}
-
-                  {isActive && (
-                    <ArrowRight
-                      size={18}
-                      className="
-                        text-[#FF6600]
-                        shrink-0
-                      "
-                    />
-                  )}
-
-                  {isLocked && (
-                    <span
-                      className="
-                        text-[9px]
-                        sm:text-[10px]
-                        font-bold
-                        text-[#9CA3AF]
-                      "
-                    >
-                      Locked
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* =================================================
-              BOTTOM BUTTON
-          ================================================= */}
-
-          <div
-            className="
-              shrink-0
-              mt-4
-              sm:mt-5
-            "
-          >
             <button
               type="button"
               onClick={() =>
-                handleLessonClick(
-                  progressCount
-                )
+                navigate(-1)
               }
-              className="
-                w-full
-                py-3
-                sm:py-3.5
-                rounded-xl
-                sm:rounded-2xl
-                font-black
-                text-sm
-                sm:text-base
-                text-white
-                flex
-                items-center
-                justify-center
-                gap-2
-                active:scale-[0.99]
-                transition-transform
-              "
+              className="w-10 h-10 rounded-xl border border-[#E5E7EB] flex items-center justify-center text-[#2E1A0F] hover:bg-[#FAF6F0] transition"
+            >
+              <ArrowLeft size={20} />
+            </button>
+
+            <div className="ml-3 min-w-0">
+
+              <h1 className="text-lg sm:text-xl font-black text-[#2E1A0F] truncate">
+                Training Course
+              </h1>
+
+              <p className="text-xs sm:text-sm text-[#7C6657]">
+                Complete all training videos
+              </p>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </header>
+
+      {/* ==================================================
+          MAIN CONTENT
+      ================================================== */}
+
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-5 sm:py-8">
+
+        {/* ==================================================
+            PROGRESS
+        ================================================== */}
+
+        <div className="bg-white rounded-3xl border border-[#F3E7DC] shadow-[0_12px_40px_rgba(100,50,15,0.06)] p-4 sm:p-5 mb-5">
+
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+
+            <div>
+
+              <p className="text-xs sm:text-sm text-[#7C6657]">
+                Training Progress
+              </p>
+
+              <h2 className="text-lg sm:text-xl font-black text-[#2E1A0F]">
+                Video{" "}
+                {currentVideo + 1}{" "}
+                of {videos.length}
+              </h2>
+
+            </div>
+
+            <div className="text-left sm:text-right">
+
+              <p className="text-sm font-bold text-[#FF6600]">
+                {completedCount} /{" "}
+                {videos.length} completed
+              </p>
+
+            </div>
+
+          </div>
+
+          <div className="mt-4 h-2 bg-[#FFF0E4] rounded-full overflow-hidden">
+
+            <div
+              className="h-full rounded-full transition-all duration-500"
               style={{
+                width: `${progressPercentage}%`,
                 background:
                   "linear-gradient(90deg, #FF6200 0%, #FFA800 100%)",
-
-                boxShadow:
-                  "0 8px 20px rgba(255,98,0,0.20)",
               }}
-            >
-              <span>
-                {progressCount === 0
-                  ? "Start Course"
-                  : `Continue Lesson ${
-                      progressCount + 1
-                    }`}
-              </span>
+            />
 
-              <ArrowRight
-                size={18}
-                strokeWidth={2.7}
-              />
-            </button>
           </div>
+
         </div>
-      </div>
+
+        {/* ==================================================
+            VIDEO CARD
+        ================================================== */}
+
+        <div className="bg-white rounded-3xl border border-[#F3E7DC] shadow-[0_12px_40px_rgba(100,50,15,0.06)] overflow-hidden">
+
+          {/* VIDEO */}
+
+          <div className="bg-black w-full aspect-video">
+
+            <video
+              key={currentVideoData.id}
+              src={currentVideoData.video}
+              controls
+              playsInline
+              preload="none"
+              onEnded={handleVideoEnded}
+              onError={handleVideoError}
+              className="w-full h-full object-contain"
+            >
+              Your browser does not support
+              the video tag.
+            </video>
+
+          </div>
+
+          {/* VIDEO DETAILS */}
+
+          <div className="p-4 sm:p-6">
+
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+
+              <div className="min-w-0">
+
+                <div className="flex items-center gap-2 mb-2">
+
+                  <span className="w-8 h-8 rounded-full bg-[#FFF0E4] text-[#FF6600] flex items-center justify-center text-sm font-bold flex-shrink-0">
+                    {currentVideoData.order}
+                  </span>
+
+                  <span className="text-xs sm:text-sm text-[#7C6657]">
+                    Training Video
+                  </span>
+
+                </div>
+
+                <h2 className="text-xl sm:text-2xl font-black text-[#2E1A0F] break-words">
+                  {currentVideoData.title}
+                </h2>
+
+              </div>
+
+              {/* COMPLETED BADGE */}
+
+              {isCurrentVideoCompleted && (
+                <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 px-3 py-2 rounded-xl text-sm font-bold self-start">
+
+                  <CheckCircle
+                    size={17}
+                  />
+
+                  Completed
+
+                </div>
+              )}
+
+            </div>
+
+            {/* ==================================================
+                MARK AS COMPLETED BUTTON
+            ================================================== */}
+
+            <div className="mt-6">
+
+              {!isCurrentVideoCompleted ? (
+
+                <button
+                  type="button"
+                  onClick={
+                    handleMarkCompleted
+                  }
+                  className="w-full py-3.5 rounded-xl text-white font-black flex items-center justify-center gap-2 shadow-md hover:shadow-lg active:scale-[0.99] transition"
+                  style={{
+                    background:
+                      "linear-gradient(90deg, #FF6200 0%, #FFA800 100%)",
+                  }}
+                >
+
+                  <CheckCircle
+                    size={20}
+                  />
+
+                  Mark as Completed
+
+                </button>
+
+              ) : (
+
+                <div className="w-full py-3.5 rounded-xl bg-green-50 border border-green-200 text-green-700 font-black flex items-center justify-center gap-2">
+
+                  <CheckCircle
+                    size={20}
+                  />
+
+                  Video Completed
+
+                </div>
+
+              )}
+
+            </div>
+
+            {/* ==================================================
+                PREVIOUS / NEXT
+            ================================================== */}
+
+            <div className="grid grid-cols-2 gap-3 mt-4">
+
+              <button
+                type="button"
+                onClick={
+                  handlePrevious
+                }
+                disabled={
+                  currentVideo === 0
+                }
+                className="border border-[#F3D7C2] bg-white hover:bg-[#FFF8F2] py-3 rounded-xl font-bold text-[#2E1A0F] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition"
+              >
+
+                <ChevronLeft
+                  size={18}
+                />
+
+                Previous
+
+              </button>
+
+              <button
+                type="button"
+                onClick={
+                  handleNext
+                }
+                disabled={
+                  currentVideo ===
+                  videos.length - 1
+                }
+                className="py-3 rounded-xl font-bold text-white disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition shadow-sm"
+                style={{
+                  background:
+                    "linear-gradient(90deg, #FF6200 0%, #FFA800 100%)",
+                }}
+              >
+
+                Next
+
+                <ChevronRight
+                  size={18}
+                />
+
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+
+        {/* ==================================================
+            COURSE VIDEOS
+        ================================================== */}
+
+        <div className="mt-5 bg-white rounded-3xl border border-[#F3E7DC] shadow-[0_12px_40px_rgba(100,50,15,0.06)] p-4 sm:p-6">
+
+          <h2 className="text-lg sm:text-xl font-black text-[#2E1A0F] mb-4">
+            Course Videos
+          </h2>
+
+          <div className="space-y-3">
+
+            {videos.map(
+              (video, index) => {
+
+                const completed =
+                  completedVideos.includes(
+                    video.id
+                  );
+
+                const active =
+                  index === currentVideo;
+
+                return (
+                  <button
+                    key={video.id}
+                    type="button"
+                    onClick={() =>
+                      setCurrentVideo(index)
+                    }
+                    className={`w-full text-left rounded-2xl border p-3 sm:p-4 transition ${
+                      active
+                        ? "border-[#FDBA74] bg-[#FFF8F2]"
+                        : "border-[#F3E7DC] bg-white hover:bg-[#FFF8F2]"
+                    }`}
+                  >
+
+                    <div className="flex items-center gap-3">
+
+                      {/* NUMBER / CHECK */}
+
+                      <div
+                        className="w-10 h-10 rounded-xl flex items-center justify-center font-bold flex-shrink-0"
+                        style={{
+                          backgroundColor:
+                            completed
+                              ? "#DCFCE7"
+                              : active
+                              ? "#FF6600"
+                              : "#FFF0E4",
+
+                          color:
+                            completed
+                              ? "#16A34A"
+                              : active
+                              ? "#FFFFFF"
+                              : "#FF6600",
+                        }}
+                      >
+
+                        {completed ? (
+                          <CheckCircle
+                            size={20}
+                          />
+                        ) : (
+                          video.order
+                        )}
+
+                      </div>
+
+                      {/* TITLE */}
+
+                      <div className="flex-1 min-w-0">
+
+                        <p
+                          className={`font-bold text-sm sm:text-base truncate ${
+                            active
+                              ? "text-[#FF6600]"
+                              : "text-[#2E1A0F]"
+                          }`}
+                        >
+                          {video.title}
+                        </p>
+
+                        <p className="text-xs text-[#7C6657] mt-1">
+                          Video{" "}
+                          {video.order}
+                        </p>
+
+                      </div>
+
+                      {/* PLAY ICON */}
+
+                      {active &&
+                        !completed && (
+                          <Play
+                            size={18}
+                            className="text-[#FF6600] flex-shrink-0"
+                          />
+                        )}
+
+                    </div>
+
+                  </button>
+                );
+              }
+            )}
+
+          </div>
+
+        </div>
+
+        {/* ==================================================
+            COMPLETE TRAINING
+        ================================================== */}
+
+        {currentVideo ===
+          videos.length - 1 && (
+
+          <div className="mt-5">
+
+            {allVideosCompleted ? (
+
+              <button
+                type="button"
+                onClick={
+                  handleCompleteTraining
+                }
+                className="w-full py-4 rounded-2xl text-white font-black text-base sm:text-lg flex items-center justify-center gap-2 shadow-md"
+                style={{
+                  background:
+                    "linear-gradient(90deg, #FF6200 0%, #FFA800 100%)",
+                }}
+              >
+
+                <CheckCircle
+                  size={21}
+                />
+
+                Complete Training
+
+              </button>
+
+            ) : (
+
+              <div className="bg-[#FFF8F2] border border-[#FED7AA] rounded-2xl p-4 text-center">
+
+                <p className="text-sm text-[#C2410C] font-bold">
+                  Please mark all training
+                  videos as completed to
+                  complete the training.
+                </p>
+
+              </div>
+
+            )}
+
+          </div>
+
+        )}
+
+      </main>
+
     </div>
   );
 }

@@ -1,6 +1,6 @@
 // src/Services/dpData.js
 
-const DP_DATA_URL = "http://127.0.0.1:8002/api/v1/common/delivery-partner/dp-data/";
+import api from "./api";
 
 /**
  * Retrieves stored authentication token
@@ -16,44 +16,40 @@ export const getAuthToken = () => {
 
 /**
  * Fetch delivery partner data from Django API
+ *
+ * Base URL comes from api.js / VITE_API_URL
+ * No hardcoded localhost:8002
  */
 export const getDpData = async () => {
   try {
-    const token = getAuthToken();
-    const headers = {
-      "Content-Type": "application/json",
-    };
+    const response = await api.get(
+      "/api/v1/common/delivery-partner/dp-data/"
+    );
 
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-
-    const response = await fetch(DP_DATA_URL, {
-      method: "GET",
-      headers,
-      credentials: "include",
-    });
-
-    if (!response.ok) {
-      console.error(`dp-data API error (${response.status})`);
-      return null;
-    }
-
-    const result = await response.json();
+    const result = response.data;
 
     if (result && result.status === true && result.data) {
       // Sync cache in localStorage
-      localStorage.setItem("dp_data", JSON.stringify(result.data));
+      localStorage.setItem(
+        "dp_data",
+        JSON.stringify(result.data)
+      );
+
       return result.data;
     }
 
     return null;
   } catch (error) {
-    console.error("Failed to fetch getDpData:", error);
+    console.error(
+      "Failed to fetch getDpData:",
+      error.response?.data || error.message
+    );
+
     return null;
   }
 };
 
-// Also export as default and fetchDpData alias for flexible imports
+// Alias
 export const fetchDpData = getDpData;
+
 export default getDpData;
