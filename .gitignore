@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Training videos
+public/videos/
+
+# Generated Android files
+android/app/build/
+android/app/src/main/assets/
+android/capacitor-cordova-android-plugins/
+android/app/src/main/res/xml/

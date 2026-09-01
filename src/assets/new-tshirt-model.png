@@ -1,0 +1,9 @@
+<svg viewBox="0 0 640 420" xmlns="http://www.w3.org/2000/svg">
+<rect x="0" y="0" width="640" height="420" fill="#FFFFFF" rx="12"/>
+<g transform="translate(320,210)">
+  <path d="M -120 -140 L -60 -160 L -20 -180 L 20 -180 L 60 -160 L 120 -140 L 150 -80 L 100 -50 L 90 -100 L 90 160 L -90 160 L -90 -100 L -100 -50 L -150 -80 Z" fill="#D85A30" stroke="#993C1D" stroke-width="3"/>
+  <path d="M -20 -180 Q 0 -140 20 -180" fill="none" stroke="#993C1D" stroke-width="3"/>
+  <text x="0" y="-10" text-anchor="middle" font-size="42" font-weight="600" fill="#FFFFFF" font-family="Arial, sans-serif">ZATPATT</text>
+  <text x="0" y="30" text-anchor="middle" font-size="18" font-weight="400" fill="#FAECE7" font-family="Arial, sans-serif">DELIVERY PARTNER</text>
+</g>
+</svg>
