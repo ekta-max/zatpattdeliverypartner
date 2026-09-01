@@ -285,7 +285,7 @@ export default function InfoPage() {
           </h2>
 
           {/* QUICK HIGHLIGHTS */}
-          <div className="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
+          <div className="mt-5 grid grid-cols-2 gap-3 sm:gap-4">
             {HIGHLIGHTS.map(({ icon: Icon, label }) => (
               <div
                 key={label}

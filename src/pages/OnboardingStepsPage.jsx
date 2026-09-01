@@ -12,332 +12,120 @@ import {
   ChevronRight,
   Sparkles,
   Store,
+  ArrowRight,
 } from "lucide-react";
-import { DEV_MODE } from "../config/appConfig";
-
-const DEFAULT_PROGRESS = {
-  work_details: "pending",
-  personal_details: "pending",
-  kit_ordered: false,
-};
+import {
+  fetchDpData,
+  evaluateDpProgress,
+} from "../Services/dpService";
 
 export default function OnboardingStepsPage() {
   const navigate = useNavigate();
 
+  const [loading, setLoading] = useState(true);
+  const [dpData, setDpData] = useState(null);
   const [progress, setProgress] = useState(null);
 
   useEffect(() => {
-    initializeOnboarding();
+    loadPartnerData();
   }, []);
 
-  const initializeOnboarding = () => {
+  const loadPartnerData = async () => {
+    setLoading(true);
+
     try {
-      /*
-       * =========================================================
-       * 1. GET CURRENT LOGGED-IN USER
-       * =========================================================
-       */
+      const data = await fetchDpData();
 
-      const storedUser = localStorage.getItem("user");
+      setDpData(data);
 
-      let user = null;
+      const evaluated = evaluateDpProgress(data);
 
-      try {
-        user = storedUser ? JSON.parse(storedUser) : null;
-      } catch (error) {
-        console.error("Invalid user data in localStorage");
-        user = null;
-      }
-
-      /*
-       * =========================================================
-       * 2. GET CURRENT MOBILE NUMBER
-       *
-       * We check multiple possible fields because your API
-       * response may use mobile / phone / mobile_number.
-       * =========================================================
-       */
-
-      const currentMobile =
-        user?.mobile ||
-        user?.mobile_number ||
-        user?.phone ||
-        user?.phone_number ||
-        localStorage.getItem("login_mobile");
-
-      /*
-       * Normalize mobile number.
-       *
-       * Example:
-       * 8898238279
-       * +918898238279
-       * 08898238279
-       *
-       * will be converted to comparable digits.
-       */
-
-      const normalizeMobile = (mobile) => {
-        if (!mobile) return "";
-
-        let value = String(mobile).replace(/\D/g, "");
-
-        // Remove India country code
-        if (value.length === 12 && value.startsWith("91")) {
-          value = value.substring(2);
-        }
-
-        // Remove leading 0
-        if (value.length === 11 && value.startsWith("0")) {
-          value = value.substring(1);
-        }
-
-        return value;
-      };
-
-      const normalizedCurrentMobile = normalizeMobile(currentMobile);
-
-      /*
-       * =========================================================
-       * 3. GET MOBILE NUMBER WHICH OWNED THE SAVED ONBOARDING
-       * =========================================================
-       */
-
-      const savedOnboardingMobile =
-        localStorage.getItem("onboarding_mobile");
-
-      const normalizedSavedMobile =
-        normalizeMobile(savedOnboardingMobile);
-
-      /*
-       * =========================================================
-       * 4. CHECK WHETHER THIS IS THE SAME USER
-       * =========================================================
-       */
-
-      let onboardingProgress = null;
-
-      if (
-        normalizedCurrentMobile &&
-        normalizedSavedMobile &&
-        normalizedCurrentMobile !== normalizedSavedMobile
-      ) {
-        /*
-         * DIFFERENT USER
-         *
-         * Example:
-         *
-         * Old user:
-         * 8898238279
-         *
-         * New user:
-         * 9876543210
-         *
-         * Remove previous user's onboarding progress.
-         */
-
-        console.log(
-          "Different user detected. Clearing previous onboarding progress."
-        );
-
-        localStorage.removeItem("onboarding_progress");
-
-        /*
-         * Store the new user's mobile number.
-         */
-
-        localStorage.setItem(
-          "onboarding_mobile",
-          normalizedCurrentMobile
-        );
-
-        /*
-         * Start fresh onboarding.
-         */
-
-        onboardingProgress = {
-          ...DEFAULT_PROGRESS,
-        };
-
-        localStorage.setItem(
-          "onboarding_progress",
-          JSON.stringify(onboardingProgress)
-        );
-      } else {
-        /*
-         * =======================================================
-         * SAME USER
-         * =======================================================
-         *
-         * Keep the existing onboarding progress.
-         */
-
-        if (normalizedCurrentMobile) {
-          /*
-           * First time setting onboarding mobile.
-           */
-
-          if (!normalizedSavedMobile) {
-            localStorage.setItem(
-              "onboarding_mobile",
-              normalizedCurrentMobile
-            );
-          }
-        }
-
-        const savedProgress = localStorage.getItem(
-          "onboarding_progress"
-        );
-
-        if (savedProgress) {
-          try {
-            onboardingProgress = JSON.parse(savedProgress);
-          } catch (error) {
-            console.error(
-              "Invalid onboarding progress. Resetting."
-            );
-
-            onboardingProgress = {
-              ...DEFAULT_PROGRESS,
-            };
-
-            localStorage.setItem(
-              "onboarding_progress",
-              JSON.stringify(onboardingProgress)
-            );
-          }
-        } else {
-          /*
-           * No previous progress.
-           * Start fresh.
-           */
-
-          onboardingProgress = {
-            ...DEFAULT_PROGRESS,
-          };
-
-          localStorage.setItem(
-            "onboarding_progress",
-            JSON.stringify(onboardingProgress)
-          );
-        }
-      }
-
-      /*
-       * =========================================================
-       * 5. SAFETY CHECK
-       * =========================================================
-       */
-
-      if (!onboardingProgress) {
-        onboardingProgress = {
-          ...DEFAULT_PROGRESS,
-        };
-      }
-
-      /*
-       * =========================================================
-       * 6. IF KIT IS ALREADY ORDERED
-       * =========================================================
-       */
-
-      if (!DEV_MODE && onboardingProgress.kit_ordered) {
-        navigate("/verification-pending", {
-          replace: true,
-        });
-
-        return;
-      }
-
-      /*
-       * =========================================================
-       * 7. SET PAGE STATE
-       * =========================================================
-       */
-
-      setProgress(onboardingProgress);
+      setProgress(evaluated);
     } catch (error) {
       console.error(
-        "Failed to initialize onboarding:",
+        "Failed to load partner onboarding data:",
         error
       );
-
-      const freshProgress = {
-        ...DEFAULT_PROGRESS,
-      };
-
-      localStorage.setItem(
-        "onboarding_progress",
-        JSON.stringify(freshProgress)
-      );
-
-      setProgress(freshProgress);
+    } finally {
+      setLoading(false);
     }
   };
 
-  /*
-   * ===========================================================
-   * LOADING
-   * ===========================================================
-   */
+  /* =========================================================
+     LOADING
+  ========================================================= */
 
-  if (!progress) {
+  if (loading || !progress) {
     return (
       <div
-        className="min-h-screen flex items-center justify-center"
+        className="
+          min-h-dvh
+          w-full
+          flex
+          items-center
+          justify-center
+          px-4
+        "
         style={{
           backgroundColor: "#FAF6F0",
         }}
       >
-        <div className="flex items-center gap-2 text-sm font-bold text-[#FF6600]">
-          <div className="w-5 h-5 border-2 border-[#FF6600] border-t-transparent rounded-full animate-spin" />
+        <div
+          className="
+            flex
+            items-center
+            gap-2
+            text-sm
+            font-bold
+            text-[#FF6600]
+          "
+        >
+          <div
+            className="
+              w-5
+              h-5
+              border-2
+              border-[#FF6600]
+              border-t-transparent
+              rounded-full
+              animate-spin
+            "
+          />
 
-          Loading your onboarding...
+          <span>Loading your onboarding...</span>
         </div>
       </div>
     );
   }
 
-  /*
-   * ===========================================================
-   * STEP STATUS
-   * ===========================================================
-   */
+  const {
+    step1Done,
+    step2Done,
+    step3Done,
+    isVerified,
+  } = progress;
 
-  const workDone =
-    progress.work_details === "completed";
-
-  const personalDone =
-    progress.personal_details === "completed";
-
-  const kitDone =
-    progress.kit_ordered === true;
-
-  const completedCount = [
-    workDone,
-    personalDone,
-    kitDone,
-  ].filter(Boolean).length;
-
-  /*
-   * ===========================================================
-   * UI
-   * ===========================================================
-   */
+  const allOnboardingDone =
+    step1Done &&
+    step2Done &&
+    step3Done;
 
   return (
     <div
       className="
-        min-h-screen
+        min-h-dvh
         w-full
         flex
         flex-col
-        justify-between
         items-center
         relative
         overflow-x-hidden
-        p-3.5
-        sm:p-5
-        md:p-7
+        px-3
+        py-3
+        sm:px-5
+        sm:py-5
+        md:px-7
+        md:py-7
         select-none
       "
       style={{
@@ -349,13 +137,11 @@ export default function OnboardingStepsPage() {
             rgba(255, 230, 205, 0.7) 0%,
             transparent 40%
           ),
-
           radial-gradient(
             circle at 92% 25%,
             rgba(255, 226, 195, 0.75) 0%,
             transparent 38%
           ),
-
           radial-gradient(
             circle at 85% 85%,
             rgba(255, 234, 212, 0.55) 0%,
@@ -365,7 +151,7 @@ export default function OnboardingStepsPage() {
       }}
     >
       {/* =====================================================
-          BACKGROUND FLOATING BADGES
+          DECORATIVE ICONS
       ===================================================== */}
 
       <div
@@ -381,7 +167,6 @@ export default function OnboardingStepsPage() {
           border
           border-[#FFE7D3]
           shadow-sm
-          flex
           items-center
           justify-center
           pointer-events-none
@@ -408,12 +193,11 @@ export default function OnboardingStepsPage() {
           border
           border-[#FFE7D3]
           shadow-sm
-          flex
           items-center
           justify-center
           pointer-events-none
           hidden
-          sm:flex
+          md:flex
         "
       >
         <Sparkles
@@ -426,18 +210,28 @@ export default function OnboardingStepsPage() {
           MAIN CONTAINER
       ===================================================== */}
 
-      <div className="w-full max-w-[760px] my-auto z-10">
-
-        {/* ===================================================
-            HERO BANNER
-        =================================================== */}
+      <div
+        className="
+          w-full
+          max-w-[760px]
+          my-auto
+          z-10
+        "
+      >
+        {/* =================================================
+            HERO
+        ================================================= */}
 
         <div
           className="
-            rounded-t-[26px]
-            sm:rounded-t-[32px]
-            p-6
-            sm:p-8
+            rounded-t-[24px]
+            sm:rounded-t-[28px]
+            md:rounded-t-[32px]
+            px-5
+            py-5
+            sm:px-7
+            sm:py-7
+            md:p-8
             relative
             overflow-hidden
             text-white
@@ -447,47 +241,56 @@ export default function OnboardingStepsPage() {
               "linear-gradient(155deg, #FF6000 0%, #FF7A00 45%, #FFA600 100%)",
           }}
         >
-          <div className="flex items-center justify-between">
+          {/* LOGO PILL */}
 
-            <div
+          <div
+            className="
+              inline-flex
+              items-center
+              gap-2
+              px-3
+              sm:px-3.5
+              py-1.5
+              rounded-full
+              bg-white/20
+              backdrop-blur-md
+              border
+              border-white/25
+            "
+          >
+            <span
               className="
-                inline-flex
-                items-center
-                gap-2
-                px-3.5
-                py-1.5
+                w-2
+                h-2
                 rounded-full
-                bg-white/20
-                backdrop-blur-md
-                border
-                border-white/25
+                bg-white
+                animate-pulse
+              "
+            />
+
+            <span
+              className="
+                text-[9px]
+                sm:text-xs
+                font-black
+                tracking-[1.4px]
+                text-white
+                uppercase
               "
             >
-              <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-
-              <span
-                className="
-                  text-[10px]
-                  sm:text-xs
-                  font-black
-                  tracking-[1.4px]
-                  text-white
-                  uppercase
-                "
-              >
-                ZATPATT
-              </span>
-            </div>
-
-    
+              ZATPATT
+            </span>
           </div>
+
+          {/* TITLE */}
 
           <h1
             className="
-              mt-4
+              mt-3
+              sm:mt-4
               text-[22px]
               sm:text-[26px]
-              md:text-[28px]
+              md:text-[30px]
               font-black
               leading-tight
               tracking-tight
@@ -496,14 +299,17 @@ export default function OnboardingStepsPage() {
             Welcome to Zatpatt Delivery!
           </h1>
 
+          {/* DESCRIPTION */}
+
           <p
             className="
-              mt-1
+              mt-2
               text-xs
               sm:text-sm
+              md:text-[15px]
               text-white/90
               leading-relaxed
-              max-w-[480px]
+              max-w-[520px]
             "
           >
             Complete your 3 simple setup steps to start
@@ -511,16 +317,18 @@ export default function OnboardingStepsPage() {
           </p>
         </div>
 
-        {/* ===================================================
+        {/* =================================================
             STEPS CARD
-        =================================================== */}
+        ================================================= */}
 
         <div
           className="
             bg-white
-            rounded-b-[26px]
-            sm:rounded-b-[32px]
-            p-5
+            rounded-b-[24px]
+            sm:rounded-b-[28px]
+            md:rounded-b-[32px]
+            px-4
+            py-5
             sm:p-7
             md:p-8
             shadow-[0_20px_60px_rgba(100,50,15,0.08)]
@@ -529,124 +337,241 @@ export default function OnboardingStepsPage() {
             border-t-0
           "
         >
+          {/* =================================================
+              CHECKLIST HEADER
+          ================================================= */}
 
           <div
             className="
               flex
               items-center
               justify-between
+              gap-2
               mb-4
-              pb-2
+              pb-2.5
               border-b
               border-[#F3E7DC]
             "
           >
             <h2
               className="
-                text-xs
+                text-[11px]
+                sm:text-xs
                 font-black
                 tracking-wider
                 text-[#7C6657]
                 uppercase
               "
             >
-              SETUP CHECKLIST
+              Setup Checklist
             </h2>
 
-            
+            <span
+              className="
+                text-[10px]
+                sm:text-xs
+                font-bold
+                text-[#FF6600]
+                whitespace-nowrap
+              "
+            >
+              {
+                [
+                  step1Done,
+                  step2Done,
+                  step3Done,
+                ].filter(Boolean).length
+              }{" "}
+              of 3 completed
+            </span>
           </div>
 
-          {/* STEP 1 */}
+          {/* =================================================
+              STEP 1
+          ================================================= */}
 
           <StepItem
             step={1}
             title="Work Details"
-            subtitle="Select your preferred City & Vehicle Type"
-            icon={<Briefcase size={20} />}
+            subtitle={
+              step1Done && dpData?.city
+                ? `City: ${dpData.city} • Vehicle: ${
+                    dpData.vehicle_type || "Selected"
+                  }`
+                : "Select your preferred City & Vehicle Type"
+            }
+            icon={<Briefcase size={19} />}
             status={
-              workDone
+              step1Done
                 ? "done"
                 : "active"
             }
-            onClick={() => {
-              if (!workDone) {
-                navigate("/work-details");
-              }
-            }}
+            onClick={() =>
+              navigate("/work-details")
+            }
           />
 
-          {/* STEP 2 */}
+          {/* =================================================
+              STEP 2
+          ================================================= */}
 
           <StepItem
             step={2}
             title="Personal & KYC Details"
-            subtitle="Aadhaar, PAN, Bank Details & Selfie"
-            icon={<User size={20} />}
+            subtitle={
+              step2Done
+                ? "Aadhaar, PAN & Bank verification completed"
+                : "Aadhaar, PAN, Bank Details & Selfie"
+            }
+            icon={<User size={19} />}
             status={
-              !workDone
+              !step1Done
                 ? "locked"
-                : personalDone
+                : step2Done
                 ? "done"
                 : "active"
             }
             onClick={() => {
-              if (
-                workDone &&
-                !personalDone
-              ) {
-                navigate("/personal-details");
+              if (step1Done) {
+                navigate(
+                  "/personal-details"
+                );
               }
             }}
           />
 
-          {/* STEP 3 */}
+          {/* =================================================
+              STEP 3
+          ================================================= */}
 
           <StepItem
             step={3}
             title="Order Zatpatt Partner Kit"
-            subtitle="T-Shirts, Delivery Bag"
-            icon={<FileText size={20} />}
+            subtitle={
+              step3Done
+                ? `Size selected: ${String(
+                    dpData?.tshirt_size
+                  ).toUpperCase()}`
+                : "T-Shirts, Delivery Bag"
+            }
+            icon={<FileText size={19} />}
             status={
-              !workDone || !personalDone
+              !step1Done || !step2Done
                 ? "locked"
-                : kitDone
+                : step3Done
                 ? "done"
                 : "active"
             }
             onClick={() => {
               if (
-                workDone &&
-                personalDone &&
-                !kitDone
+                step1Done &&
+                step2Done
               ) {
-                navigate("/order-partner-kit");
+                navigate(
+                  "/order-partner-kit"
+                );
               }
             }}
           />
 
-          {/* HELP */}
+          {/* =================================================
+              ONBOARDING COMPLETE
+          ================================================= */}
+
+          {allOnboardingDone && (
+            <div
+              className="
+                mt-5
+                pt-4
+                border-t
+                border-[#F3E7DC]
+              "
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  if (isVerified) {
+                    navigate(
+                      "/training-intro"
+                    );
+                  } else {
+                    navigate(
+                      "/verification-pending"
+                    );
+                  }
+                }}
+                className="
+                  w-full
+                  py-3.5
+                  sm:py-4
+                  px-4
+                  rounded-xl
+                  sm:rounded-2xl
+                  font-black
+                  text-sm
+                  sm:text-base
+                  text-white
+                  flex
+                  items-center
+                  justify-center
+                  gap-2
+                  transition-all
+                  active:scale-[0.99]
+                "
+                style={{
+                  background:
+                    "linear-gradient(90deg, #FF6200 0%, #FFA800 100%)",
+
+                  boxShadow:
+                    "0 10px 25px rgba(255,98,0,0.25)",
+                }}
+              >
+                <span className="truncate">
+                  {isVerified
+                    ? "Proceed to Partner Training"
+                    : "Check Verification Status"}
+                </span>
+
+                <ArrowRight
+                  size={18}
+                  className="shrink-0"
+                />
+              </button>
+            </div>
+          )}
+
+          {/* =================================================
+              HELP
+          ================================================= */}
 
           <div
             className="
-              mt-6
+              mt-5
               pt-4
               border-t
               border-[#F3E7DC]
               flex
-              items-center
+              items-start
               justify-center
-              gap-2
-              text-xs
+              gap-1.5
+              text-[11px]
+              sm:text-xs
               font-bold
               text-[#FF6600]
+              text-center
+              leading-4
               cursor-pointer
               hover:underline
             "
           >
-            <HelpCircle size={16} />
+            <HelpCircle
+              size={15}
+              className="shrink-0 mt-0.5"
+            />
 
             <span>
               Need assistance with onboarding?
+              <br className="sm:hidden" />{" "}
               Contact Partner Support
             </span>
           </div>
@@ -657,21 +582,30 @@ export default function OnboardingStepsPage() {
           FOOTER
       ===================================================== */}
 
-      <div className="relative z-10 shrink-0 mt-4">
-
+      <div
+        className="
+          relative
+          z-10
+          shrink-0
+          mt-3
+          sm:mt-4
+        "
+      >
         <div
           className="
             bg-[#FFEADA]/70
             backdrop-blur-md
-            px-8
-            py-2
+            px-5
+            sm:px-8
+            py-1.5
+            sm:py-2
             rounded-full
             border
             border-[#FED7AA]/60
             flex
             items-center
             gap-2
-            text-[10px]
+            text-[9px]
             sm:text-xs
             font-medium
             text-[#7C6657]
@@ -694,7 +628,7 @@ export default function OnboardingStepsPage() {
 
 /*
  * =============================================================
- * STEP ITEM COMPONENT
+ * STEP ITEM
  * =============================================================
  */
 
@@ -713,7 +647,7 @@ function StepItem({
   return (
     <div
       onClick={
-        isActive
+        !isLocked
           ? onClick
           : undefined
       }
@@ -722,15 +656,17 @@ function StepItem({
         relative
         flex
         items-center
-        gap-3.5
+        gap-2.5
         sm:gap-4
-        p-4
-        sm:p-4.5
+        px-3
+        py-3
+        sm:p-4
         rounded-2xl
         mb-3
         border
         transition-all
         duration-200
+        overflow-hidden
       "
       style={{
         backgroundColor: isActive
@@ -749,12 +685,12 @@ function StepItem({
           ? "0 4px 18px rgba(255,102,0,0.08)"
           : "none",
 
-        cursor: isActive
+        cursor: !isLocked
           ? "pointer"
-          : "default",
+          : "not-allowed",
       }}
     >
-      {/* Active indicator */}
+      {/* ACTIVE INDICATOR */}
 
       {isActive && (
         <div
@@ -763,19 +699,24 @@ function StepItem({
             left-0
             top-0
             bottom-0
-            w-1.5
+            w-1
+            sm:w-1.5
             rounded-l-2xl
             bg-[#FF6600]
           "
         />
       )}
 
-      {/* Step badge */}
+      {/* =====================================================
+          STEP ICON
+      ===================================================== */}
 
       <div
         className="
           w-10
           h-10
+          sm:w-11
+          sm:h-11
           rounded-xl
           flex
           items-center
@@ -804,7 +745,6 @@ function StepItem({
         {isDone ? (
           <CheckCircle2
             size={20}
-            className="text-white"
           />
         ) : isLocked ? (
           <Lock size={16} />
@@ -813,15 +753,23 @@ function StepItem({
         )}
       </div>
 
-      {/* Content */}
+      {/* =====================================================
+          TEXT
+      ===================================================== */}
 
       <div className="flex-1 min-w-0">
-
-        <div className="flex items-center gap-2">
-
+        <div
+          className="
+            flex
+            items-center
+            gap-1.5
+            sm:gap-2
+            min-w-0
+          "
+        >
           <h3
             className="
-              text-xs
+              text-[13px]
               sm:text-sm
               font-extrabold
               truncate
@@ -835,34 +783,44 @@ function StepItem({
             {title}
           </h3>
 
+          {/* COMPLETED */}
+
           {isDone && (
             <span
               className="
-                px-2
+                px-1.5
+                sm:px-2
                 py-0.5
                 rounded-full
-                text-[9px]
+                text-[8px]
+                sm:text-[9px]
                 font-bold
                 uppercase
                 bg-green-100
                 text-green-700
+                shrink-0
               "
             >
               Completed
             </span>
           )}
 
+          {/* PENDING */}
+
           {isActive && (
             <span
               className="
-                px-2
+                px-1.5
+                sm:px-2
                 py-0.5
                 rounded-full
-                text-[9px]
+                text-[8px]
+                sm:text-[9px]
                 font-bold
                 uppercase
                 bg-[#FFF0E0]
                 text-[#FF6600]
+                shrink-0
               "
             >
               Pending
@@ -872,7 +830,7 @@ function StepItem({
 
         <p
           className="
-            text-[11px]
+            text-[10px]
             sm:text-xs
             text-[#7C6657]
             mt-0.5
@@ -883,15 +841,23 @@ function StepItem({
         </p>
       </div>
 
-      {/* Right icon */}
+      {/* =====================================================
+          RIGHT ICON
+      ===================================================== */}
 
-      <div className="shrink-0 text-[#7C6657]">
-
+      <div
+        className="
+          shrink-0
+          text-[#7C6657]
+        "
+      >
         {isActive ? (
           <div
             className="
-              w-8
-              h-8
+              w-7
+              h-7
+              sm:w-8
+              sm:h-8
               rounded-lg
               bg-white
               border
@@ -904,7 +870,9 @@ function StepItem({
               transition-transform
             "
           >
-            <ChevronRight size={18} />
+            <ChevronRight
+              size={17}
+            />
           </div>
         ) : (
           <div className="opacity-40">

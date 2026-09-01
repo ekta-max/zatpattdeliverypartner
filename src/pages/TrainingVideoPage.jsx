@@ -1,8 +1,9 @@
-//src\pages\TrainingVideoPage.jsx
+// src/pages/TrainingVideoPage.jsx
 
 import React, { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, ArrowLeft } from "lucide-react";
+import axios from "axios";
 
 const LESSONS = [
   {
@@ -22,134 +23,414 @@ const LESSONS = [
   },
 ];
 
+const MARK_COURSE_API =
+  "http://localhost:8002/api/v1/common/delivery-partner/mark-course/";
+
 export default function TrainingVideoPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+
   const videoRef = useRef(null);
 
-  // ✅ tracks the furthest point actually watched (not just "last time")
+  // =========================================================
+  // VIDEO PROGRESS
+  // =========================================================
+
   const maxTimeRef = useRef(0);
 
   const lessonId = Number(id);
-  const lessonIndex = LESSONS.findIndex((l) => l.id === lessonId);
+
+  const lessonIndex = LESSONS.findIndex(
+    (lesson) => lesson.id === lessonId
+  );
+
+  const currentLesson = LESSONS[lessonIndex];
 
   const [videoEnded, setVideoEnded] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  /* 🔐 HARD FLOW PROTECTION */
+  // =========================================================
+  // CHECK LESSON ACCESS
+  // =========================================================
+
   useEffect(() => {
-    const completed = localStorage.getItem("training_completed");
+    const completed = localStorage.getItem(
+      "training_completed"
+    );
+
     const progress = Number(
       localStorage.getItem("training_progress") || 0
     );
 
+    // Training already completed
     if (completed === "true") {
-      navigate("/dashboard", { replace: true });
+      navigate("/training-completed", {
+        replace: true,
+      });
       return;
     }
 
+    // Invalid lesson
     if (lessonIndex === -1) {
-      navigate("/training", { replace: true });
+      navigate("/training", {
+        replace: true,
+      });
       return;
     }
+
+    /*
+     * Only the current lesson can be opened.
+     *
+     * progress = 0 -> lesson 1
+     * progress = 1 -> lesson 2
+     * progress = 2 -> lesson 3
+     */
 
     if (lessonIndex !== progress) {
-      navigate("/training", { replace: true });
+      navigate("/training", {
+        replace: true,
+      });
     }
   }, [lessonIndex, navigate]);
 
-  // ✅ reset the watched-progress tracker whenever the lesson changes
+  // =========================================================
+  // RESET WATCH PROGRESS WHEN LESSON CHANGES
+  // =========================================================
+
   useEffect(() => {
     maxTimeRef.current = 0;
     setVideoEnded(false);
   }, [lessonIndex]);
 
-  /* ✅ Track furthest point reached during normal playback */
+  // =========================================================
+  // TRACK VIDEO TIME
+  // =========================================================
+
   const handleTimeUpdate = () => {
     if (!videoRef.current) return;
-    const current = videoRef.current.currentTime;
+
+    const current =
+      videoRef.current.currentTime;
+
     if (current > maxTimeRef.current) {
       maxTimeRef.current = current;
     }
   };
 
-  /* ✅ Only correct AFTER the seek completes (not mid-drag) —
-     this is what fixes the freeze. Allows rewinding freely,
-     only snaps back if the user tried to skip ahead. */
+  // =========================================================
+  // PREVENT SKIPPING
+  // =========================================================
+
   const handleSeeked = () => {
     if (!videoRef.current) return;
 
-    if (videoRef.current.currentTime > maxTimeRef.current + 0.5) {
-      // small buffer (0.5s) avoids fighting normal playback rounding
-      videoRef.current.currentTime = maxTimeRef.current;
+    if (
+      videoRef.current.currentTime >
+      maxTimeRef.current + 0.5
+    ) {
+      videoRef.current.currentTime =
+        maxTimeRef.current;
     }
 
-    // ✅ ensure playback actually resumes after a corrected seek
     videoRef.current.play().catch(() => {
-      // autoplay restrictions can reject this silently — ignore
+      // Ignore autoplay restrictions
     });
   };
+
+  // =========================================================
+  // VIDEO ENDED
+  // =========================================================
 
   const handleEnded = () => {
     setVideoEnded(true);
   };
 
-  const handleMarkCompleted = () => {
-    const currentProgress = Number(
-      localStorage.getItem("training_progress") || 0
-    );
+  // =========================================================
+  // MARK COURSE COMPLETED
+  // =========================================================
 
-    const nextProgress = currentProgress + 1;
+  const handleMarkCompleted = async () => {
+    if (!videoEnded) return;
 
-    if (nextProgress >= LESSONS.length) {
-      localStorage.setItem("training_completed", "true");
-      localStorage.removeItem("training_progress");
-      navigate("/training-completed", { replace: true });
-    } else {
-      localStorage.setItem("training_progress", String(nextProgress));
-      navigate("/training", { replace: true });
+    if (submitting) return;
+
+    try {
+      setSubmitting(true);
+
+      const currentProgress = Number(
+        localStorage.getItem(
+          "training_progress"
+        ) || 0
+      );
+
+      /*
+       * Current lesson index:
+       *
+       * lesson 1 -> index 0
+       * lesson 2 -> index 1
+       * lesson 3 -> index 2
+       */
+
+      const nextProgress = Math.max(
+        currentProgress,
+        lessonIndex + 1
+      );
+
+      // =====================================================
+      // BUILD API PAYLOAD
+      // =====================================================
+
+      const payload = {
+        first_video: nextProgress >= 1,
+        second_video: nextProgress >= 2,
+        third_video: nextProgress >= 3,
+      };
+
+      console.log(
+        "Mark course payload:",
+        payload
+      );
+
+      // =====================================================
+      // GET TOKEN
+      // =====================================================
+
+      const token =
+        localStorage.getItem("access_token") ||
+        localStorage.getItem("accessToken");
+
+      // =====================================================
+      // API REQUEST
+      // =====================================================
+
+      const response = await axios.post(
+        MARK_COURSE_API,
+        payload,
+        {
+          headers: {
+            "Content-Type": "application/json",
+
+            ...(token && {
+              Authorization: `Bearer ${token}`,
+            }),
+          },
+        }
+      );
+
+      console.log(
+        "Mark course response:",
+        response.data
+      );
+
+      // =====================================================
+      // UPDATE LOCAL PROGRESS
+      // =====================================================
+
+      if (nextProgress >= LESSONS.length) {
+        // All videos completed
+
+        localStorage.setItem(
+          "training_completed",
+          "true"
+        );
+
+        localStorage.setItem(
+          "training_progress",
+          String(LESSONS.length)
+        );
+
+        navigate("/training-completed", {
+          replace: true,
+        });
+
+        return;
+      }
+
+      // =====================================================
+      // MOVE TO NEXT LESSON
+      // =====================================================
+
+      localStorage.setItem(
+        "training_progress",
+        String(nextProgress)
+      );
+
+      navigate("/training", {
+        replace: true,
+      });
+    } catch (error) {
+      console.error(
+        "Failed to mark course completed:",
+        error
+      );
+
+      console.error(
+        "API response:",
+        error?.response?.data
+      );
+
+      alert(
+        error?.response?.data?.message ||
+          error?.response?.data?.detail ||
+          "Unable to mark lesson as completed. Please try again."
+      );
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-black flex flex-col">
-      <video
-        ref={videoRef}
-        key={LESSONS[lessonIndex]?.videoUrl}
-        autoPlay
-        controls
-        controlsList="nodownload noplaybackrate"
-        disablePictureInPicture
-        onTimeUpdate={handleTimeUpdate}
-        onSeeked={handleSeeked}
-        onEnded={handleEnded}
-        className="w-full h-[70vh] object-contain"
-      >
-        <source src={LESSONS[lessonIndex]?.videoUrl} type="video/mp4" />
-      </video>
+  // =========================================================
+  // INVALID LESSON
+  // =========================================================
 
-      <div className="bg-white p-4 flex flex-col items-center gap-3">
-        <div className="text-center">
-          <p className="font-semibold text-gray-900">
-            {LESSONS[lessonIndex]?.title}
+  if (lessonIndex === -1) {
+    return null;
+  }
+
+  // =========================================================
+  // PAGE
+  // =========================================================
+
+  return (
+    <div className="h-dvh w-full bg-black flex flex-col overflow-hidden">
+      {/* =====================================================
+          VIDEO
+      ===================================================== */}
+
+      <div className="flex-1 min-h-0 flex items-center justify-center bg-black">
+        <video
+          ref={videoRef}
+          key={currentLesson.videoUrl}
+          autoPlay
+          controls
+          controlsList="nodownload noplaybackrate"
+          disablePictureInPicture
+          onTimeUpdate={handleTimeUpdate}
+          onSeeked={handleSeeked}
+          onEnded={handleEnded}
+          className="
+            w-full
+            h-full
+            object-contain
+          "
+        >
+          <source
+            src={currentLesson.videoUrl}
+            type="video/mp4"
+          />
+        </video>
+      </div>
+
+      {/* =====================================================
+          BOTTOM PANEL
+      ===================================================== */}
+
+      <div
+        className="
+          shrink-0
+          bg-[#FAF6F0]
+          rounded-t-[24px]
+          px-4
+          py-4
+          sm:px-6
+          sm:py-5
+        "
+      >
+        {/* Lesson information */}
+
+        <div className="text-center mb-3">
+          <p
+            className="
+              text-sm
+              sm:text-base
+              font-black
+              text-[#2E1A0F]
+            "
+          >
+            {currentLesson.title}
           </p>
-          <p className="text-xs text-gray-500 mt-1">
+
+          <p
+            className="
+              text-[11px]
+              sm:text-xs
+              text-[#7C6657]
+              mt-1
+            "
+          >
             {videoEnded
-              ? "Great! Tap below to continue"
-              : "Watch till the end to continue"}
+              ? "Great! You have completed this video."
+              : "Watch the video till the end to continue."}
           </p>
         </div>
 
+        {/* =================================================
+            BUTTON
+        ================================================= */}
+
         <button
+          type="button"
           onClick={handleMarkCompleted}
-          disabled={!videoEnded}
-          className={`w-full max-w-md py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition ${
-            videoEnded
-              ? "bg-orange-500 text-white active:bg-orange-600"
-              : "bg-gray-200 text-gray-400 cursor-not-allowed"
-          }`}
+          disabled={!videoEnded || submitting}
+          className={`
+            w-full
+            max-w-[560px]
+            mx-auto
+            py-3
+            sm:py-3.5
+            rounded-xl
+            font-black
+            text-sm
+            sm:text-base
+            flex
+            items-center
+            justify-center
+            gap-2
+            transition-all
+            ${
+              videoEnded && !submitting
+                ? "text-white active:scale-[0.99]"
+                : "bg-[#E8E4E0] text-[#A9A19A] cursor-not-allowed"
+            }
+          `}
+          style={
+            videoEnded && !submitting
+              ? {
+                  background:
+                    "linear-gradient(90deg, #FF6200 0%, #FFA800 100%)",
+                  boxShadow:
+                    "0 8px 20px rgba(255,98,0,0.20)",
+                }
+              : undefined
+          }
         >
-          <CheckCircle2 size={18} />
-          Mark as Completed
+          {submitting ? (
+            <>
+              <div
+                className="
+                  w-4
+                  h-4
+                  rounded-full
+                  border-2
+                  border-white
+                  border-t-transparent
+                  animate-spin
+                "
+              />
+
+              <span>
+                Saving...
+              </span>
+            </>
+          ) : (
+            <>
+              <CheckCircle2 size={18} />
+
+              <span>
+                Mark as Completed
+              </span>
+            </>
+          )}
         </button>
       </div>
     </div>
