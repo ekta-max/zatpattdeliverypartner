@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 import {
   MapPin,
   Navigation,
@@ -9,7 +10,6 @@ import {
   ArrowRight,
   Settings,
   Info,
-  ShieldCheck,
   Store,
   Sparkles,
 } from "lucide-react";
@@ -33,6 +33,7 @@ export default function PermissionsPage() {
   const isNative = Capacitor.isNativePlatform();
 
   const [permissions, setPermissions] = useState(DEFAULT_PERMISSIONS);
+
   const [loading, setLoading] = useState({
     location: false,
     backgroundLocation: false,
@@ -42,15 +43,28 @@ export default function PermissionsPage() {
 
   const [error, setError] = useState("");
 
+  // --------------------------------------------------
+  // CHECK ALL PERMISSIONS
+  // --------------------------------------------------
+
   useEffect(() => {
     checkAllPermissions();
+
     let listener;
+
     const setupListener = async () => {
-      listener = await App.addListener("appStateChange", ({ isActive }) => {
-        if (isActive) checkAllPermissions();
-      });
+      listener = await App.addListener(
+        "appStateChange",
+        ({ isActive }) => {
+          if (isActive) {
+            checkAllPermissions();
+          }
+        }
+      );
     };
+
     setupListener();
+
     return () => {
       listener?.remove();
     };
@@ -68,172 +82,527 @@ export default function PermissionsPage() {
     }
   };
 
+  // --------------------------------------------------
+  // BROWSER PERMISSIONS
+  // --------------------------------------------------
+
   const checkBrowserPermissions = async () => {
     const current = { ...DEFAULT_PERMISSIONS };
+
     try {
       if (navigator.permissions) {
-        const p = await navigator.permissions.query({ name: "geolocation" });
-        current.location = p.state === "granted";
+        const locationPermission =
+          await navigator.permissions.query({
+            name: "geolocation",
+          });
+
+        current.location =
+          locationPermission.state === "granted";
       }
-    } catch {}
+    } catch (err) {
+      console.log("Browser location check failed", err);
+    }
+
     try {
       if (navigator.permissions) {
-        const p = await navigator.permissions.query({ name: "camera" });
-        current.camera = p.state === "granted";
+        const cameraPermission =
+          await navigator.permissions.query({
+            name: "camera",
+          });
+
+        current.camera =
+          cameraPermission.state === "granted";
       }
-    } catch {}
+    } catch (err) {
+      console.log("Browser camera check failed", err);
+    }
+
     try {
       if ("Notification" in window) {
-        current.notifications = Notification.permission === "granted";
+        current.notifications =
+          Notification.permission === "granted";
       }
-    } catch {}
+    } catch (err) {
+      console.log("Browser notification check failed", err);
+    }
+
     setPermissions(current);
   };
+
+  // --------------------------------------------------
+  // NATIVE ANDROID PERMISSIONS
+  // --------------------------------------------------
 
   const checkNativePermissions = async () => {
     const current = { ...DEFAULT_PERMISSIONS };
+
+    // LOCATION
     try {
-      const res = await Geolocation.checkPermissions();
-      current.location = res.location === "granted";
-    } catch {}
+      const locationResult =
+        await Geolocation.checkPermissions();
+
+      console.log(
+        "Location permission:",
+        locationResult
+      );
+
+      current.location =
+        locationResult.location === "granted";
+    } catch (err) {
+      console.error(
+        "Location permission check failed:",
+        err
+      );
+    }
+
+    // CAMERA
     try {
-      const res = await CapacitorCamera.checkPermissions();
-      current.camera = res.camera === "granted";
-    } catch {}
+      const cameraResult =
+        await CapacitorCamera.checkPermissions();
+
+      console.log(
+        "Camera permission:",
+        cameraResult
+      );
+
+      current.camera =
+        cameraResult.camera === "granted";
+    } catch (err) {
+      console.error(
+        "Camera permission check failed:",
+        err
+      );
+    }
+
+    // NOTIFICATIONS
     try {
-      const res = await PushNotifications.checkPermissions();
-      current.notifications = res.receive === "granted";
-    } catch {}
+      const notificationResult =
+        await PushNotifications.checkPermissions();
+
+      console.log(
+        "Notification permission:",
+        notificationResult
+      );
+
+      current.notifications =
+        notificationResult.receive === "granted";
+    } catch (err) {
+      console.error(
+        "Notification permission check failed:",
+        err
+      );
+    }
+
     setPermissions(current);
   };
 
-  /* Requests */
+  // --------------------------------------------------
+  // LOCATION PERMISSION
+  // --------------------------------------------------
+
   const requestLocationPermission = async () => {
     setError("");
-    setLoading((p) => ({ ...p, location: true }));
+
+    setLoading((prev) => ({
+      ...prev,
+      location: true,
+    }));
+
     try {
+      console.log(
+        "Requesting location permission..."
+      );
+
+      // ----------------------------------------------
+      // ANDROID / NATIVE
+      // ----------------------------------------------
+
       if (isNative) {
-        const res = await Geolocation.requestPermissions();
-        if (res.location === "granted") {
-          setPermissions((p) => ({ ...p, location: true }));
-        } else {
-          setError("Location access is required. Enable it in Settings.");
+        const current =
+          await Geolocation.checkPermissions();
+
+        console.log(
+          "Current location permission:",
+          current
+        );
+
+        // Already granted
+        if (current.location === "granted") {
+          console.log(
+            "Location permission already granted"
+          );
+
+          setPermissions((prev) => ({
+            ...prev,
+            location: true,
+          }));
+
+          return;
         }
+
+        // Request permission
+        const result =
+          await Geolocation.requestPermissions();
+
+        console.log(
+          "Location permission result:",
+          result
+        );
+
+        if (result.location === "granted") {
+          setPermissions((prev) => ({
+            ...prev,
+            location: true,
+          }));
+
+          setError("");
+
+          console.log(
+            "Location permission granted"
+          );
+        } else {
+          setPermissions((prev) => ({
+            ...prev,
+            location: false,
+          }));
+
+          setError(
+            "Location permission was not granted. Please allow location access in Android Settings."
+          );
+        }
+
         return;
       }
+
+      // ----------------------------------------------
+      // BROWSER
+      // ----------------------------------------------
+
       navigator.geolocation.getCurrentPosition(
-        () => setPermissions((p) => ({ ...p, location: true })),
-        () => setError("Please allow location access in your browser.")
+        (position) => {
+          console.log(
+            "Browser location:",
+            position.coords.latitude,
+            position.coords.longitude
+          );
+
+          setPermissions((prev) => ({
+            ...prev,
+            location: true,
+          }));
+
+          setError("");
+        },
+        (err) => {
+          console.error(
+            "Browser location error:",
+            err
+          );
+
+          setError(
+            "Please allow location access in your browser."
+          );
+        }
       );
-    } catch {
-      setError("Unable to request location permission.");
+    } catch (err) {
+      console.error(
+        "Location permission error:",
+        err
+      );
+
+      setError(
+        "Unable to request location permission. Please check Android Settings."
+      );
     } finally {
-      setLoading((p) => ({ ...p, location: false }));
+      setLoading((prev) => ({
+        ...prev,
+        location: false,
+      }));
     }
   };
+
+  // --------------------------------------------------
+  // BACKGROUND LOCATION
+  // --------------------------------------------------
 
   const requestBackgroundLocation = async () => {
     setError("");
+
     if (!permissions.location) {
-      setError("Please allow Foreground Location first.");
+      setError(
+        "Please allow Location Access first."
+      );
+
       return;
     }
-    setLoading((p) => ({ ...p, backgroundLocation: true }));
+
+    setLoading((prev) => ({
+      ...prev,
+      backgroundLocation: true,
+    }));
+
     try {
       if (!isNative) {
-        setError("Background location is available in the Android app.");
+        setError(
+          "Background location is available in the Android app."
+        );
+
         return;
       }
-      let granted = false;
+
+      console.log(
+        "Starting background location..."
+      );
+
+      let locationReceived = false;
+
       await BackgroundGeolocation.start(
         {
-          backgroundMessage: "Tracking deliveries for Zatpatt.",
-          backgroundTitle: "Zatpatt Delivery Tracking",
+          backgroundMessage:
+            "Tracking deliveries for Zatpatt.",
+
+          backgroundTitle:
+            "Zatpatt Delivery Tracking",
+
           requestPermissions: true,
         },
-        (loc) => {
-          if (loc) granted = true;
+
+        (location) => {
+          console.log(
+            "Background location received:",
+            location
+          );
+
+          locationReceived = true;
         }
       );
-      await new Promise((r) => setTimeout(r, 1500));
-      if (granted) {
-        setPermissions((p) => ({ ...p, backgroundLocation: true }));
+
+      await new Promise((resolve) =>
+        setTimeout(resolve, 1500)
+      );
+
+      if (locationReceived) {
+        setPermissions((prev) => ({
+          ...prev,
+          backgroundLocation: true,
+        }));
+
+        setError("");
       } else {
-        setError("Please select 'Allow all the time' in Android Settings.");
+        setError(
+          "Please allow 'Allow all the time' location access in Android Settings."
+        );
       }
-    } catch {
-      setError("Please allow 'All the time' location access in Settings.");
+    } catch (err) {
+      console.error(
+        "Background location error:",
+        err
+      );
+
+      setError(
+        "Please allow 'All the time' location access in Android Settings."
+      );
     } finally {
-      setLoading((p) => ({ ...p, backgroundLocation: false }));
+      setLoading((prev) => ({
+        ...prev,
+        backgroundLocation: false,
+      }));
     }
   };
+
+  // --------------------------------------------------
+  // CAMERA
+  // --------------------------------------------------
 
   const requestCameraPermission = async () => {
     setError("");
-    setLoading((p) => ({ ...p, camera: true }));
+
+    setLoading((prev) => ({
+      ...prev,
+      camera: true,
+    }));
+
     try {
       if (isNative) {
-        const res = await CapacitorCamera.requestPermissions({ permissions: ["camera"] });
-        if (res.camera === "granted") {
-          setPermissions((p) => ({ ...p, camera: true }));
+        const result =
+          await CapacitorCamera.requestPermissions({
+            permissions: ["camera"],
+          });
+
+        console.log(
+          "Camera permission result:",
+          result
+        );
+
+        if (result.camera === "granted") {
+          setPermissions((prev) => ({
+            ...prev,
+            camera: true,
+          }));
         } else {
-          setError("Camera permission denied. Enable in Settings.");
+          setError(
+            "Camera permission denied. Please enable camera access in Settings."
+          );
         }
+
         return;
       }
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      stream.getTracks().forEach((t) => t.stop());
-      setPermissions((p) => ({ ...p, camera: true }));
-    } catch {
-      setError("Please allow camera access in browser settings.");
+
+      const stream =
+        await navigator.mediaDevices.getUserMedia({
+          video: true,
+        });
+
+      stream
+        .getTracks()
+        .forEach((track) => track.stop());
+
+      setPermissions((prev) => ({
+        ...prev,
+        camera: true,
+      }));
+    } catch (err) {
+      console.error(
+        "Camera permission error:",
+        err
+      );
+
+      setError(
+        "Please allow camera access in browser/device settings."
+      );
     } finally {
-      setLoading((p) => ({ ...p, camera: false }));
+      setLoading((prev) => ({
+        ...prev,
+        camera: false,
+      }));
     }
   };
+
+  // --------------------------------------------------
+  // NOTIFICATIONS
+  // --------------------------------------------------
 
   const requestNotificationPermission = async () => {
     setError("");
-    setLoading((p) => ({ ...p, notifications: true }));
+
+    setLoading((prev) => ({
+      ...prev,
+      notifications: true,
+    }));
+
     try {
       if (isNative) {
-        const res = await PushNotifications.requestPermissions();
-        if (res.receive === "granted") {
-          setPermissions((p) => ({ ...p, notifications: true }));
+        const result =
+          await PushNotifications.requestPermissions();
+
+        console.log(
+          "Notification permission:",
+          result
+        );
+
+        if (result.receive === "granted") {
+          setPermissions((prev) => ({
+            ...prev,
+            notifications: true,
+          }));
+
           try {
             await PushNotifications.register();
-          } catch {}
+          } catch (registerError) {
+            console.error(
+              "Notification registration error:",
+              registerError
+            );
+          }
+
           return;
         }
-        setError("Notification permission denied. Enable in Settings.");
+
+        setError(
+          "Notification permission denied. Please enable notifications in Settings."
+        );
+
         return;
       }
-      const res = await Notification.requestPermission();
-      if (res === "granted") {
-        setPermissions((p) => ({ ...p, notifications: true }));
+
+      const result =
+        await Notification.requestPermission();
+
+      if (result === "granted") {
+        setPermissions((prev) => ({
+          ...prev,
+          notifications: true,
+        }));
       } else {
-        setError("Please allow notifications in browser site settings.");
+        setError(
+          "Please allow notifications in browser settings."
+        );
       }
-    } catch {
-      setError("Unable to request notification permission.");
+    } catch (err) {
+      console.error(
+        "Notification permission error:",
+        err
+      );
+
+      setError(
+        "Unable to request notification permission."
+      );
     } finally {
-      setLoading((p) => ({ ...p, notifications: false }));
+      setLoading((prev) => ({
+        ...prev,
+        notifications: false,
+      }));
     }
   };
 
-  const handlePermissionClick = async (key) => {
-    if (loading[key]) return;
+  // --------------------------------------------------
+  // HANDLE PERMISSION CLICK
+  // --------------------------------------------------
 
-    // Toggle off if already granted — UI-only, does not revoke the actual OS permission
-    if (permissions[key]) {
-      setPermissions((p) => ({ ...p, [key]: false }));
+  const handlePermissionClick = async (key) => {
+    if (loading[key]) {
       return;
     }
 
-    if (key === "location") await requestLocationPermission();
-    if (key === "backgroundLocation") await requestBackgroundLocation();
-    if (key === "camera") await requestCameraPermission();
-    if (key === "notifications") await requestNotificationPermission();
+    console.log(
+      "Permission clicked:",
+      key
+    );
+
+    /*
+      IMPORTANT:
+
+      Do NOT simply turn the UI off when permission
+      is already granted.
+
+      The Android permission must be controlled by
+      Android itself.
+    */
+
+    if (key === "location") {
+      await requestLocationPermission();
+      return;
+    }
+
+    if (key === "backgroundLocation") {
+      await requestBackgroundLocation();
+      return;
+    }
+
+    if (key === "camera") {
+      await requestCameraPermission();
+      return;
+    }
+
+    if (key === "notifications") {
+      await requestNotificationPermission();
+      return;
+    }
   };
+
+  // --------------------------------------------------
+  // PERMISSION LIST
+  // --------------------------------------------------
 
   const permissionItems = useMemo(
     () => [
@@ -242,28 +611,40 @@ export default function PermissionsPage() {
         icon: Navigation,
         title: "Location Access",
         label: "Essential",
+        description:
+          "Allow the app to access your current location.",
       },
       {
         key: "backgroundLocation",
         icon: MapPin,
         title: "Background Location",
         label: "Recommended",
+        description:
+          "Allow location tracking while the app is in the background.",
       },
       {
         key: "camera",
         icon: Camera,
         title: "Camera Access",
         label: "Essential",
+        description:
+          "Required to capture documents and photos.",
       },
       {
         key: "notifications",
         icon: Bell,
         title: "Push Notifications",
         label: "Essential",
+        description:
+          "Receive important order and delivery updates.",
       },
     ],
     []
   );
+
+  // --------------------------------------------------
+  // REQUIRED PERMISSIONS
+  // --------------------------------------------------
 
   const grantedCount = [
     permissions.location,
@@ -271,21 +652,57 @@ export default function PermissionsPage() {
     permissions.notifications,
   ].filter(Boolean).length;
 
-  const allRequiredGranted = grantedCount === 3;
+  const allRequiredGranted =
+    grantedCount === 3;
+
+  // --------------------------------------------------
+  // OPEN ANDROID SETTINGS
+  // --------------------------------------------------
+
+  const openSettings = async () => {
+    try {
+      if (isNative) {
+        await BackgroundGeolocation.openSettings();
+      }
+    } catch (err) {
+      console.error(
+        "Unable to open settings:",
+        err
+      );
+    }
+  };
+
+  // --------------------------------------------------
+  // UI
+  // --------------------------------------------------
 
   return (
     <div
       className="min-h-screen w-full flex flex-col justify-between items-center relative overflow-x-hidden p-4 sm:p-6 md:p-8"
       style={{
         backgroundColor: "#FAF6F0",
+
         backgroundImage: `
-          radial-gradient(circle at 10% 15%, rgba(255, 230, 205, 0.65) 0%, transparent 35%),
-          radial-gradient(circle at 92% 25%, rgba(255, 226, 195, 0.7) 0%, transparent 32%),
-          radial-gradient(circle at 85% 85%, rgba(255, 234, 212, 0.5) 0%, transparent 30%)
+          radial-gradient(
+            circle at 10% 15%,
+            rgba(255, 230, 205, 0.65) 0%,
+            transparent 35%
+          ),
+          radial-gradient(
+            circle at 92% 25%,
+            rgba(255, 226, 195, 0.7) 0%,
+            transparent 32%
+          ),
+          radial-gradient(
+            circle at 85% 85%,
+            rgba(255, 234, 212, 0.5) 0%,
+            transparent 30%
+          )
         `,
       }}
     >
-      {/* Floating Badges */}
+      {/* Floating badges */}
+
       <div className="absolute top-12 left-6 sm:left-14 w-10 h-10 rounded-xl bg-white/90 backdrop-blur-sm border border-[#FFE7D3] shadow-[0_6px_20px_rgba(255,102,0,0.06)] flex items-center justify-center pointer-events-none hidden xs:flex">
         <Store size={18} color="#FF6600" />
       </div>
@@ -296,153 +713,237 @@ export default function PermissionsPage() {
 
       <div className="w-full h-2" />
 
-      {/* Main Container */}
+      {/* Main container */}
+
       <div className="w-full max-w-[620px] my-auto z-10">
         <div className="bg-white rounded-[26px] sm:rounded-[30px] p-6 sm:p-8 md:p-9 shadow-[0_20px_60px_rgba(100,50,15,0.07)] border border-[#F3E7DC]">
-          
-          {/* Header Brand Badge */}
+
+          {/* Header */}
+
           <div className="flex items-center justify-between pb-5 border-b border-[#F3E7DC]">
             <div className="flex items-center gap-3">
+
               <div
                 className="w-10 h-10 rounded-xl flex items-center justify-center shadow-md"
                 style={{
-                  background: "linear-gradient(135deg, #FF6000, #FFA600)",
+                  background:
+                    "linear-gradient(135deg, #FF6000, #FFA600)",
                 }}
               >
-                <ShieldCheck size={20} color="white" />
+                <Settings
+                  size={20}
+                  color="white"
+                />
               </div>
+
               <div>
                 <span className="text-[10px] font-extrabold uppercase tracking-[1.4px] text-[#FF6600]">
                   ZATPATT
                 </span>
+
                 <h3 className="text-sm font-bold text-[#2E1A0F]">
                   App Permissions
                 </h3>
               </div>
+
             </div>
           </div>
 
           {/* Heading */}
+
           <div className="mt-6 mb-5">
             <h1 className="text-[22px] sm:text-[24px] font-black text-[#2E1A0F] leading-tight">
               Let's get you ready to deliver.
             </h1>
+
             <p className="text-xs sm:text-sm text-[#7C6657] mt-1.5">
-              Allow the following permissions to ensure seamless order dispatch and live tracking.
+              Allow the following permissions to ensure
+              seamless order dispatch and live tracking.
             </p>
           </div>
 
-          {/* Permission List */}
+          {/* Permission list */}
+
           <div className="space-y-3">
+
             {permissionItems.map((item) => {
               const Icon = item.icon;
-              const granted = permissions[item.key];
-              const isItemLoading = loading[item.key];
+
+              const granted =
+                permissions[item.key];
+
+              const isItemLoading =
+                loading[item.key];
 
               return (
                 <button
                   key={item.key}
                   type="button"
-                  onClick={() => handlePermissionClick(item.key)}
+                  onClick={() =>
+                    handlePermissionClick(item.key)
+                  }
                   disabled={isItemLoading}
                   className="w-full text-left p-3.5 sm:p-4 rounded-2xl border transition-all flex items-center gap-3.5 relative overflow-hidden"
                   style={{
-                    backgroundColor: granted ? "#FFFCF9" : "#FFFFFF",
-                    borderColor: granted ? "#FED7AA" : "#E5E7EB",
-                    boxShadow: granted ? "0 4px 18px rgba(255,102,0,0.06)" : "none",
+                    backgroundColor: granted
+                      ? "#FFFCF9"
+                      : "#FFFFFF",
+
+                    borderColor: granted
+                      ? "#FED7AA"
+                      : "#E5E7EB",
+
+                    boxShadow: granted
+                      ? "0 4px 18px rgba(255,102,0,0.06)"
+                      : "none",
                   }}
                 >
-                  {/* Left Active Orange Bar */}
+
+                  {/* Orange active bar */}
+
                   {granted && (
                     <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#FF6600]" />
                   )}
 
-                  {/* Icon Box */}
+                  {/* Icon */}
+
                   <div
                     className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border"
                     style={{
-                      backgroundColor: granted ? "#FFF5EC" : "#FAF6F0",
-                      borderColor: granted ? "#FED7AA" : "#F3E7DC",
+                      backgroundColor: granted
+                        ? "#FFF5EC"
+                        : "#FAF6F0",
+
+                      borderColor: granted
+                        ? "#FED7AA"
+                        : "#F3E7DC",
                     }}
                   >
                     <Icon
                       size={20}
-                      color={granted ? "#FF6600" : "#7C6657"}
+                      color={
+                        granted
+                          ? "#FF6600"
+                          : "#7C6657"
+                      }
                       strokeWidth={2}
                     />
                   </div>
 
-                  {/* Info */}
+                  {/* Information */}
+
                   <div className="flex-1 min-w-0">
+
                     <div className="flex items-center gap-2">
+
                       <h4 className="text-xs sm:text-sm font-bold text-[#2E1A0F] truncate">
                         {item.title}
                       </h4>
+
                       <span
                         className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider"
                         style={{
                           backgroundColor:
-                            item.label === "Essential" ? "#FFF5EC" : "#F3F4F6",
+                            item.label === "Essential"
+                              ? "#FFF5EC"
+                              : "#F3F4F6",
+
                           color:
-                            item.label === "Essential" ? "#FF6600" : "#6B7280",
+                            item.label === "Essential"
+                              ? "#FF6600"
+                              : "#6B7280",
                         }}
                       >
                         {item.label}
                       </span>
+
                     </div>
+
                     <p className="text-[11px] text-[#7C6657] mt-0.5 line-clamp-1">
                       {item.description}
                     </p>
+
                   </div>
 
-                  {/* Status Indicator */}
+                  {/* Status */}
+
                   <div
                     className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all"
                     style={{
-                      backgroundColor: granted ? "#16A34A" : "#F3F4F6",
+                      backgroundColor: granted
+                        ? "#16A34A"
+                        : "#F3F4F6",
                     }}
                   >
+
                     {isItemLoading ? (
                       <div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
                     ) : granted ? (
-                      <Check size={16} color="white" strokeWidth={3} />
+                      <Check
+                        size={16}
+                        color="white"
+                        strokeWidth={3}
+                      />
                     ) : (
-                      <ArrowRight size={15} color="#9CA3AF" />
+                      <ArrowRight
+                        size={15}
+                        color="#9CA3AF"
+                      />
                     )}
+
                   </div>
+
                 </button>
               );
             })}
+
           </div>
 
-          {/* Error Alert */}
+          {/* Error */}
+
           {error && (
             <div className="mt-4 p-3.5 rounded-xl bg-red-50 border border-red-200 flex items-start gap-2.5">
-              <Info size={16} color="#DC2626" className="shrink-0 mt-0.5" />
+
+              <Info
+                size={16}
+                color="#DC2626"
+                className="shrink-0 mt-0.5"
+              />
+
               <div className="flex-1 text-xs text-red-600 font-medium leading-relaxed">
+
                 {error}
-                {error.includes("Settings") && (
+
+                {isNative && (
                   <button
                     type="button"
-                    onClick={() => {
-                      if (isNative) BackgroundGeolocation.openSettings();
-                    }}
+                    onClick={openSettings}
                     className="mt-1.5 flex items-center gap-1 px-3 py-1 rounded-lg bg-[#FF6600] text-white text-[10px] font-bold"
                   >
                     <Settings size={12} />
                     Open Settings
                   </button>
                 )}
+
               </div>
+
             </div>
           )}
 
-          {/* Continue Button */}
+          {/* Continue */}
+
           <button
             type="button"
             onClick={() => {
-              if (allRequiredGranted) navigate("/location-picker");
-              else setError("Please grant all required permissions to continue.");
+
+              if (allRequiredGranted) {
+                navigate("/location-picker");
+              } else {
+                setError(
+                  "Please grant all required permissions to continue."
+                );
+              }
+
             }}
             disabled={!allRequiredGranted}
             className="group relative mt-6 w-full h-[50px] rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all duration-200 disabled:cursor-not-allowed"
@@ -450,33 +951,55 @@ export default function PermissionsPage() {
               background: allRequiredGranted
                 ? "linear-gradient(90deg, #FF6200 0%, #FFA800 100%)"
                 : "#E5E7EB",
-              color: allRequiredGranted ? "#FFFFFF" : "#9CA3AF",
+
+              color: allRequiredGranted
+                ? "#FFFFFF"
+                : "#9CA3AF",
+
               boxShadow: allRequiredGranted
                 ? "0 10px 24px rgba(255,98,0,0.24)"
                 : "none",
             }}
           >
+
             <span>
               {allRequiredGranted
                 ? "Continue to Location Picker"
-                : `Allow ${3 - grantedCount} More Required`}
+                : `Allow ${
+                    3 - grantedCount
+                  } More Required`}
             </span>
+
             <ArrowRight
               size={16}
               className="transition-transform duration-200 group-hover:translate-x-1"
             />
+
           </button>
+
         </div>
       </div>
 
       {/* Footer */}
+
       <div className="relative mt-8 z-10 flex justify-center">
+
         <div className="bg-[#FFEADA]/70 backdrop-blur-md px-8 py-2 rounded-full border border-[#FED7AA]/60 flex items-center gap-2 text-[10px] sm:text-[11px] font-medium text-[#7C6657]">
-          <span>© {new Date().getFullYear()} Zatpatt</span>
+
+          <span>
+            © {new Date().getFullYear()} Zatpatt
+          </span>
+
           <span>•</span>
-          <span>Delivery Partner Portal</span>
+
+          <span>
+            Delivery Partner Portal
+          </span>
+
         </div>
+
       </div>
+
     </div>
   );
 }
